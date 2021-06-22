@@ -1,0 +1,42 @@
+[package]
+name = "trigger"
+version = "1.1.2"
+authors = ["Kay Lin <i@v2bv.net>"]
+description = "Yet another GitHub/GitLab Webhook listener"
+homepage = "https://github.com/RedL0tus/trigger"
+repository = "https://github.com/RedL0tus/trigger"
+keywords = ["github", "gitlab", "ci", "webhook"]
+categories = ["command-line-utilities", "web-programming::http-server"]
+readme = "README.md"
+edition = "2018"
+license = "MIT"
+
+[badges]
+travis-ci = { repository = "RedL0tus/trigger", branch = "master" }
+
+[dependencies]
+log = "~0.4"
+clap = { version = "~2.33", default-features = false, features = [] }
+hyper = "~0.12"
+yaml-rust = "~0.4"
+run_script = "~0.2"
+pretty_env_logger = "~0.3"
+
+[dependencies.rifling]
+version = "~0.4"
+default-features = false
+features = [
+    "hyper-support",
+    "logging",
+    "crypto-use-rustcrypto",
+    "content-type-urlencoded"
+]
+
+[profile.release]
+lto = true
+debug = false
+panic = 'abort'
+rpath = false
+opt-level = 'z'
+codegen-units = 1
+debug-assertions = false

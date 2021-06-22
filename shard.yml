@@ -1,0 +1,19 @@
+name: bitte_ci
+version: 0.1.0
+
+authors:
+  - Michael Fellinger <michael.fellinger@iohk.io>
+
+targets:
+  bitte_ci:
+    main: src/bitte_ci.cr
+
+crystal: 1.0.0
+
+license: MIT
+
+dependencies:
+  kemal:
+    github: kemalcr/kemal
+  pg:
+    github: will/crystal-pg
