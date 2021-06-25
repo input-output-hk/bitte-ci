@@ -20,20 +20,14 @@
       overlay = final: prev: {
         nomad = bitte.legacyPackages.x86_64-linux.nomad;
 
-        bitte-ci-ruby = prev.bundlerEnv {
-          ruby = prev.ruby_3_0;
-          name = "bitte-ci-gems";
-          gemdir = ./.;
-        };
-
         bitte-ci-env = prev.symlinkJoin {
           name = "bitte-ci-env";
           paths = with prev; [ bashInteractive cacert coreutils gitMinimal ];
         };
 
-        arion = arion.defaultPackage.x86_64-linux;
+        bitte-ci = prev.callPackage ./pkgs/bitte-ci {};
 
-        mint = prev.callPackage ./pkgs/mint { };
+        arion = arion.defaultPackage.x86_64-linux;
 
         trigger = prev.callPackage ./pkgs/trigger { src = trigger-source; };
 
@@ -43,7 +37,7 @@
 
         triggerConfig = builtins.toJSON {
           settings = {
-            host = "0.0.0.0:7777";
+            host = "0.0.0.0:3132";
             secret = "oos0kahquaiNaiciz8MaeHohNgaejien";
             print_commands = false;
             capture_output = false;
@@ -66,7 +60,7 @@
             '';
 
             pull_request = ''
-              echo "$PAYLOAD" | ./run.rb
+              echo "$PAYLOAD" | ${final.crystal}/bin/crystal run ./run.cr
             '';
 
             all = ''
@@ -102,25 +96,15 @@
     in {
       legacyPackages.x86_64-linux = pkgs;
 
-      packages.x86_64-linux.mint = pkgs.mint;
+      packages.x86_64-linux.bitte-ci = pkgs.bitte-ci;
 
-      defaultPackage.x86_64-linux = self.packages.x86_64-linux.mint;
+      defaultPackage.x86_64-linux = self.packages.x86_64-linux.bitte-ci;
 
       devShell.x86_64-linux = pkgs.mkShell {
-        RUST_BACKTRACE = "1";
-        RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
         DOCKER_HOST = "unix:///run/podman/podman.sock";
 
         buildInputs = with pkgs; [
-          bitte-ci-ruby
-          bitte-ci-ruby.wrappedRuby
-          rust-analyzer
-          cargo
-          clippy
-          rls
-          rustc
           pkgs.arion
-          rustfmt
           websocat
           grafana-loki
           nomad
@@ -133,6 +117,7 @@
           crystal2nix
           openssl
           pkg-config
+          gmp
         ];
       };
     };

@@ -87,17 +87,17 @@
       service.network_mode = "host";
     };
 
-    trigger = {
-      service.useHostStore = true;
-      service.command = [
-        "${pkgs.trigger}/bin/trigger"
-        "--config"
-        (builtins.toFile "trigger.yml" pkgs.triggerConfig)
-      ];
+    # trigger = {
+    #   service.useHostStore = true;
+    #   service.command = [
+    #     "${pkgs.trigger}/bin/trigger"
+    #     "--config"
+    #     (pkgs.writeText "trigger.yml" pkgs.triggerConfig)
+    #   ];
 
-      service.environment = { TRIGGER_LOG = "debug"; };
-      service.ports = [ "3132:3130" ];
-    };
+    #   service.environment = { TRIGGER_LOG = "debug"; };
+    #   service.ports = [ "3132:3132" ];
+    # };
 
     postgres = let
       hba = pkgs.writeText "pg_hba.conf" ''
@@ -128,7 +128,7 @@
           ln -sfn ${pkgs.bashInteractive}/bin/bash /bin/sh
 
           mkdir -p "$PGDATA"
-          chmod -R 0777 "$PGDATA"
+          chmod -R 0700 "$PGDATA"
           chown -R postgres:postgres "$PGDATA"
 
           if [ ! -s "$PGDATA/PG_VERSION" ]; then

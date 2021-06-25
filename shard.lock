@@ -1,5 +1,13 @@
 version: 2.0
 shards:
+  admiral:
+    git: https://github.com/jwaldrip/admiral.cr.git
+    version: 1.11.4
+
+  clear:
+    git: https://github.com/anykeyh/clear.git
+    version: 0.9+git.commit.775e877c4f961da01fa621ae7ca302cb735198df
+
   db:
     git: https://github.com/crystal-lang/crystal-db.git
     version: 0.10.1
@@ -7,6 +15,14 @@ shards:
   exception_page:
     git: https://github.com/crystal-loot/exception_page.git
     version: 0.1.5
+
+  generate:
+    git: https://github.com/anykeyh/generate.cr.git
+    version: 0.1.0+git.commit.f5dafc934a70e0ee2f246dddf3df44686f844da2
+
+  inflector:
+    git: https://github.com/anykeyh/inflector.cr.git
+    version: 0.1.8+git.commit.dc5c898b0a834617d8b3ff73ac5a2239bd9fc019
 
   kemal:
     git: https://github.com/kemalcr/kemal.git

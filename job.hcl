@@ -2,7 +2,7 @@ job "bitte-ci" {
   datacenters = ["dc1"]
   type        = "batch"
 
-  group "@@UUID@@" {
+  group "@@GROUP_NAME@@" {
     task "runner" {
       driver = "exec"
 
@@ -93,6 +93,7 @@ job "bitte-ci" {
               nomad_job_parent_id: '{{ env "NOMAD_JOB_PARENT_ID" }}'
               nomad_namespace: '{{ env "NOMAD_NAMESPACE" }}'
               nomad_region: '{{ env "NOMAD_REGION" }}'
+              bitte_ci_id: '@@BITTE_CI_ID@@'
               __path__: /alloc/logs/*.std*.[0-9]*
         EOH
       }

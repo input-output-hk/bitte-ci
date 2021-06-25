@@ -15,5 +15,6 @@ license: MIT
 dependencies:
   kemal:
     github: kemalcr/kemal
-  pg:
-    github: will/crystal-pg
+  clear:
+    github: anykeyh/clear
+    branch: master

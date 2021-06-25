@@ -1,4 +1,6 @@
-/target
 /.direnv
 /lib
 /.tmp-arion*
+/coverage
+/bitte_ci
+/bitte_ci_spec
