@@ -1,4 +1,5 @@
 require "kemal"
+require "./uuid"
 
 module BitteCI
   class LokiQueryRange
@@ -44,11 +45,9 @@ module BitteCI
   alias ChannelControl = Channel(ChannelControlMessage)
 
   class Connection
-    @socket : HTTP::WebSocket
-    @control : ChannelControl
     @channel : Channel(String)
 
-    def initialize(@socket, @control)
+    def initialize(@socket : HTTP::WebSocket, @control : ChannelControl, @config : Config)
       @channel = Channel(String).new
     end
 
@@ -115,12 +114,16 @@ module BitteCI
         {
           "direction" => ["FORWARD"],
           "query"     => [%({bitte_ci_id="#{build.loki_id}"})],
-          "start"     => [((Time.utc - 24.hours).to_unix_ms * 1000000).to_s],
-          "end"       => [(Time.utc.to_unix_ms * 1000000).to_s],
+          "start"     => [((build.created_at).to_unix_ms * 1000000).to_s],
+          "end"       => [((build.finished_at || Time.utc).to_unix_ms * 1000000).to_s],
         }
       )
 
-      res = HTTP::Client.get("http://127.0.0.1:3120/loki/api/v1/query_range?" + query.to_s)
+      url = @config.loki_url.dup
+      url.path = "/loki/api/v1/query_range"
+      url.query = query.to_s
+
+      res = HTTP::Client.get(url)
 
       dec = LokiQueryRange.from_json(res.body)
 
@@ -128,9 +131,7 @@ module BitteCI
 
       dec.data.result.each do |result|
         next if result.stream["filename"] =~ /promtail\./
-        pp! result.stream
         id = UUID.new(result.stream["nomad_alloc_id"])
-        pp! id
 
         current = logs[id]?
         current ||= Array(NamedTuple(time: Time, line: String)).new
@@ -151,17 +152,17 @@ module BitteCI
     end
   end
 
-  def self.start(github_user : String, github_token : String)
+  def self.start(config : Config, github_user : String, github_token : String)
     control = ChannelControl.new(10)
     channels = [] of Channel(String)
     start_control(control, channels)
 
-    PG.connect_listen OPTIONS[:db_url], "allocations", "github", "builds" do |n|
+    PG.connect_listen config.db_url, "allocations", "github", "builds" do |n|
       obj =
         case n.channel
         when "builds"
           build = Build.query.where { id == n.payload }.first
-          pp! build.send_github_status(user: github_user, token: github_token) if build
+          pp! build.send_github_status(user: github_user, token: github_token, target_url: config.public_url) if build
           build
         when "pull_requests"
           PullRequest.query.where { id == n.payload }.first
@@ -173,7 +174,21 @@ module BitteCI
     end
 
     ws "/ci/api/v1/socket" do |socket|
-      Connection.new(socket, control).run
+      Connection.new(socket, control, config).run
+    end
+
+    public_folder config.frontend_path
+
+    index_html = File.read(File.join(config.frontend_path, "index.html"))
+
+    get "/" do
+      index_html
+    end
+
+    %w[pull_requests pull_request build].each do |sub|
+      get "/#{sub}/*" do
+        index_html
+      end
     end
   end
 

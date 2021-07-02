@@ -1,5 +1,5 @@
 {
-  description = "A very basic flake";
+  description = "Flake for Bitte CI";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05";
@@ -13,27 +13,42 @@
       flake = false;
     };
     arion.url = "github:hercules-ci/arion";
+    bitte-ci-frontend.url = "github:input-output-hk/bitte-ci-frontend";
   };
 
-  outputs = { self, nixpkgs, rust, bitte, trigger-source, arion }@inputs:
+  outputs = { self, ... }@inputs:
     let
       overlay = final: prev: {
-        nomad = bitte.legacyPackages.x86_64-linux.nomad;
+        nomad = inputs.bitte.legacyPackages.${prev.system}.nomad;
 
         bitte-ci-env = prev.symlinkJoin {
           name = "bitte-ci-env";
-          paths = with prev; [ bashInteractive cacert coreutils gitMinimal ];
+          paths = with prev; [
+            bashInteractive
+            cacert
+            coreutils
+            gitMinimal
+            hello
+          ];
         };
 
-        bitte-ci = prev.callPackage ./pkgs/bitte-ci {};
+        bitte-ci = prev.callPackage ./pkgs/bitte-ci {
+          src = prev.lib.sourceFilesBySuffices ./. [".cr" ".lock" ".yml" ".cue"];
+        };
 
-        arion = arion.defaultPackage.x86_64-linux;
+        bitte-ci-frontend =
+          inputs.bitte-ci-frontend.defaultPackage.${prev.system};
 
-        trigger = prev.callPackage ./pkgs/trigger { src = trigger-source; };
+        arion = inputs.arion.defaultPackage.${prev.system};
+
+        trigger =
+          prev.callPackage ./pkgs/trigger { src = inputs.trigger-source; };
 
         reproxy = prev.callPackage ./pkgs/reproxy { };
 
         ngrok = prev.callPackage ./pkgs/ngrok { };
+
+        tests = prev.callPackage ./tests { };
 
         triggerConfig = builtins.toJSON {
           settings = {
@@ -86,12 +101,15 @@
           };
         };
 
-        project = arion.lib.build { modules = [ ./arion-compose.nix ]; pkgs = final; };
+        project = inputs.arion.lib.build {
+          modules = [ ./arion-compose.nix ];
+          pkgs = final;
+        };
       };
 
-      pkgs = import nixpkgs {
+      pkgs = import inputs.nixpkgs {
         system = "x86_64-linux";
-        overlays = [ rust.overlay overlay ];
+        overlays = [ inputs.rust.overlay overlay ];
       };
     in {
       legacyPackages.x86_64-linux = pkgs;
@@ -111,6 +129,8 @@
           reproxy
           ngrok
           trigger
+
+          cue
 
           crystal
           shards

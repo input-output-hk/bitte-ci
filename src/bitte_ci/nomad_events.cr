@@ -2,12 +2,13 @@ require "http/client"
 require "json"
 require "db"
 require "pg"
+require "./uuid"
 
 module BitteCI
   module NomadEvents
     # TODO: refactor to use Clear
-    def self.listen(db_url : String, loki_url : URI)
-      DB.open(db_url) do |db|
+    def self.listen(config : Config)
+      DB.open(config.db_url.to_s) do |db|
         index = 0i64
 
         db.query "SELECT COALESCE(MAX(index), 0) from allocations;" do |rs|
@@ -16,14 +17,16 @@ module BitteCI
           end
         end
 
-        loki_url.query = URI::Params.new({
+        nomad_url = config.nomad_url.dup
+        nomad_url.path = "/v1/event/stream"
+        nomad_url.query = URI::Params.new({
           "topic" => ["Allocation"],
           "index" => [index.to_s],
         }).to_s
 
-        pp! loki_url
+        pp! nomad_url
 
-        HTTP::Client.get(loki_url) do |res|
+        HTTP::Client.get(nomad_url) do |res|
           res.body_io.each_line do |line|
             next if line == "{}"
             j = Line.from_json(line)

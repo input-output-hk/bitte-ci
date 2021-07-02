@@ -31,9 +31,7 @@ job "bitte-ci" {
 
         cd "$dir"
 
-        if [ -s ci.sh ]; then
-          sh ci.sh
-        fi
+        "$COMMAND"
 
         # Ensure logs are flushed
         sleep 10
@@ -56,6 +54,7 @@ job "bitte-ci" {
         LABEL = "@@pull_request.head.label@@"
         REF = "@@pull_request.head.ref@@"
         FULL_NAME = "@@pull_request.head.repo.full_name@@"
+        COMMAND = "@@COMMAND@@"
       }
     }
 

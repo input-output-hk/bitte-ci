@@ -40,3 +40,7 @@ shards:
     git: https://github.com/luislavena/radix.git
     version: 0.4.1
 
+  toml:
+    git: https://github.com/manveru/toml.cr.git
+    version: 0.7.0+git.commit.d7dce13e42f02e320f9f1192ce900650ef1e4cdd
+

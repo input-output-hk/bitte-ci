@@ -1,4 +1,5 @@
 require "clear"
+require "./uuid"
 
 Clear.enum BuildStatus, "pending", "running", "complete", "failed"
 
@@ -52,28 +53,25 @@ class Build
     end
   end
 
-  def target_url
-    "http://127.0.0.1:3120/job/#{id}"
-  end
-
-  def status_url
-    pull_request.data["pull_request"]["statuses_url"].to_s
+  def statuses_url
+    URI.parse(pull_request.data["pull_request"]["statuses_url"].as_s)
   end
 
   # TODO: only send status if something changed
-  def send_github_status(user : String, token : String)
+  def send_github_status(user : String, token : String, target_url : URI)
     description = "Nothing here yet..."
+
     body = {
       state:       step_to_state,
-      target_url:  target_url,
+      target_url:  target_url.dup.tap { |url| url.path = "/job/#{id}" },
       description: description[0..138],
       context:     "Bitte CI",
     }
 
-    uri = URI.parse(status_url)
+    uri = statuses_url
     client = HTTP::Client.new(uri)
     client.basic_auth user, token
-    response = client.post(
+    res = client.post(
       uri.path,
       headers: HTTP::Headers{
         "Accept" => "application/vnd.github.v3+json",
@@ -81,8 +79,11 @@ class Build
       body: body.to_json,
     )
 
-    if response.status != HTTP::Status::CREATED
-      pp! response
+    case res.status
+    when HTTP::Status::CREATED
+      res
+    else
+      raise "HTTP Error while trying to POST github status to #{uri} : #{res.status.to_i} #{res.status_message}"
     end
   end
 end
@@ -96,20 +97,6 @@ class Allocation
   column client_status : String
   column index : Int64
   column eval_id : UUID
-end
-
-struct UUID
-  def self.new(pull : JSON::PullParser)
-    new pull.read_string
-  end
-
-  def to_json(builder : JSON::Builder)
-    builder.string to_s
-  end
-
-  def to_json_object_key
-    to_s
-  end
 end
 
 class Migration1
@@ -152,4 +139,3 @@ class Migration1
     end
   end
 end
-

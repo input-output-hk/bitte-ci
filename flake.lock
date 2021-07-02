@@ -45,6 +45,24 @@
         "type": "github"
       }
     },
+    "bitte-ci-frontend": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_5"
+      },
+      "locked": {
+        "lastModified": 1624624987,
+        "narHash": "sha256-8etGs7F55+JDW5PG2Aun34sBOlG1VEQZRhjQsJBR40A=",
+        "owner": "input-output-hk",
+        "repo": "bitte-ci-frontend",
+        "rev": "8a054fddfb8c16762bca9968eeb71ddfa14fc575",
+        "type": "github"
+      },
+      "original": {
+        "owner": "input-output-hk",
+        "repo": "bitte-ci-frontend",
+        "type": "github"
+      }
+    },
     "bitte-cli": {
       "inputs": {
         "nixpkgs": "nixpkgs_2",
@@ -210,6 +228,22 @@
         "type": "github"
       }
     },
+    "nixpkgs_6": {
+      "locked": {
+        "lastModified": 1623961232,
+        "narHash": "sha256-5X5v37GTBFdQnc3rvbSPJyAtO+/z1wHZF3Kz61g2Mx4=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "bad3ccd099ebe9a8aa017bda8500ab02787d90aa",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-21.05",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "nomad-source": {
       "flake": false,
       "locked": {
@@ -247,7 +281,8 @@
       "inputs": {
         "arion": "arion",
         "bitte": "bitte",
-        "nixpkgs": "nixpkgs_5",
+        "bitte-ci-frontend": "bitte-ci-frontend",
+        "nixpkgs": "nixpkgs_6",
         "rust": "rust_2",
         "trigger-source": "trigger-source"
       }

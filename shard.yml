@@ -1,11 +1,11 @@
-name: bitte_ci
+name: "bitte-ci"
 version: 0.1.0
 
 authors:
   - Michael Fellinger <michael.fellinger@iohk.io>
 
 targets:
-  bitte_ci:
+  bitte-ci:
     main: src/bitte_ci.cr
 
 crystal: 1.0.0

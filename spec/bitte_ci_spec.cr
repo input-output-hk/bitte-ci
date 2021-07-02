@@ -11,7 +11,16 @@ describe BitteCI do
 
     BitteCI.start_control(control, channels)
 
-    conn = BitteCI::Connection.new(socket, control).run
+    config = BitteCI::Config.new(
+      public_url: URI.parse("http://127.0.0.1:9494"),
+      db_url: URI.parse("postgres:localhost:5432/bitte_ci"),
+      loki_url: URI.parse("http://127.0.0.1:3100"),
+      nomad_url: URI.parse("http://127.0.0.1:4646"),
+      frontend_path: "result",
+      githubusercontent_url: URI.parse("http://127.0.0.1:8080")
+    )
+
+    conn = BitteCI::Connection.new(socket, control, config).run
     Fiber.yield
     channels.size.should eq(1)
   end
