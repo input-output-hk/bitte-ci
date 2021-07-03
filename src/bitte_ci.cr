@@ -11,7 +11,8 @@ config = BitteCI::Config.new(
   loki_url: URI.parse(ENV["BITTE_CI_LOKI_URL"]? || "http://127.0.0.1:3120"),
   nomad_url: URI.parse(ENV["BITTE_CI_NOMAD_URL"]? || "http://127.0.0.1:4646"),
   frontend_path: ENV["BITTE_CI_FRONTEND_DIR"]? || "result",
-  githubusercontent_url: URI.parse(ENV["BITTE_CI_GITHUBUSERCONTENT_URL"]? || "https://raw.githubusercontent.com")
+  githubusercontent_url: URI.parse(ENV["BITTE_CI_GITHUBUSERCONTENT_URL"]? || "https://raw.githubusercontent.com"),
+  secret: ENV["BITTE_CI_GITHUB_SECRET"]? || "dummy"
 )
 
 action = BitteCI::Cmd::None
@@ -42,6 +43,10 @@ op = OptionParser.parse do |parser|
 
   parser.on "--nomad-url=VALUE", "Domain that nomad runs on" do |value|
     config.nomad_url = URI.parse(value)
+  end
+
+  parser.on "--secret=VALUE", "Github hook secret" do |value|
+    config.secret = value
   end
 
   parser.on "--server", "Start the webserver" do
@@ -77,20 +82,22 @@ module BitteCI
     property nomad_url : URI
     property githubusercontent_url : URI
     property frontend_path : String
+    property secret : String
 
     def initialize(
-      @public_url : URI,
-      @db_url : URI,
-      @loki_url : URI,
-      @nomad_url : URI,
-      @githubusercontent_url : URI,
-      @frontend_path : String
+      @public_url,
+      @db_url,
+      @loki_url,
+      @nomad_url,
+      @githubusercontent_url,
+      @frontend_path,
+      @secret
     )
     end
   end
 end
 
-puts "starting #{action}"
+puts "starting action: #{action}"
 
 case action
 in BitteCI::Cmd::Queue

@@ -185,6 +185,10 @@ module BitteCI
       index_html
     end
 
+    post "/api/v1/github" do |env|
+      BitteCI::Trigger.handle(config, env)
+    end
+
     %w[pull_requests pull_request build].each do |sub|
       get "/#{sub}/*" do
         index_html
