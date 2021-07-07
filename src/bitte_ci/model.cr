@@ -63,7 +63,7 @@ class Build
 
     body = {
       state:       step_to_state,
-      target_url:  target_url.dup.tap { |url| url.path = "/job/#{id}" },
+      target_url:  target_url.dup.tap { |url| url.path = "/build/#{id}" },
       description: description[0..138],
       context:     "Bitte CI",
     }
