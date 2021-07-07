@@ -83,7 +83,9 @@ class Build
     when HTTP::Status::CREATED
       res
     else
-      raise "HTTP Error while trying to POST github status to #{uri} : #{res.status.to_i} #{res.status_message}"
+      Log.error {
+        "HTTP Error while trying to POST github status to #{uri} : #{res.status.to_i} #{res.status_message}"
+      }
     end
   end
 end
