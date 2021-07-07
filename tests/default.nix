@@ -38,6 +38,7 @@ let
       --nomad-base-url "http://localhost:4646" \
       --public-url "http://example.com" \
       --loki-base-url "http://localhost:3100" \
+      --nomad-token foobar \
       --github-hook-secret "oos0kahquaiNaiciz8MaeHohNgaejien" \
       --github-user "tester" \
       --github-token "token" \
