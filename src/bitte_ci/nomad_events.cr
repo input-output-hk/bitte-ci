@@ -24,9 +24,13 @@ module BitteCI
           "index" => [index.to_s],
         }).to_s
 
+        headers = HTTP::Headers{
+          "X-Nomad-Token" => [config.nomad_token],
+        }
+
         context = ssl_context(config) if nomad_url.scheme == "https"
 
-        HTTP::Client.get(nomad_url, tls: context) do |res|
+        HTTP::Client.get(nomad_url, headers: headers, tls: context) do |res|
           res.body_io.each_line do |line|
             Log.info { line }
             next if line == "{}"
