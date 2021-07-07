@@ -63,6 +63,11 @@ in {
       script = ''
         exec bitte-ci server ${flags}
       '';
+
+      serviceConfig = {
+        Restart = "on-failure";
+        RestartSec = "5s";
+      };
     };
 
     systemd.services.bitte-ci-listener = {
@@ -78,6 +83,11 @@ in {
       script = ''
         exec bitte-ci listen ${flags}
       '';
+
+      serviceConfig = {
+        Restart = "on-failure";
+        RestartSec = "5s";
+      };
     };
 
     systemd.services.bitte-ci-migrate = {
@@ -92,8 +102,13 @@ in {
       script = ''
         exec bitte-ci migrate ${flags}
       '';
-      serviceConfig.Type = "oneshot";
-      serviceConfig.RemainAfterExit = true;
+
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        Restart = "on-failure";
+        RestartSec = "5s";
+      };
     };
   });
 }
