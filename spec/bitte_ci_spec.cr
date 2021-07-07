@@ -7,7 +7,7 @@ describe BitteCI do
 
     c = BitteCI::Config.configure do |config|
       ENV["BITTE_CI_LOKI_BASE_URL"] = loki_url
-      config["nomad_token_file"] = File.join(__DIR__, "fixtures/nomad_token")
+      config["nomad_token_file"] = File.join(__DIR__, "fixtures/nomad_token.fixture")
 
       config["public_url"] = public_url
       config["postgres_url"] = "postgres://localhost:5432/bitte_ci"

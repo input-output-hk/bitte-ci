@@ -34,7 +34,7 @@
 
         bitte-ci = prev.callPackage ./pkgs/bitte-ci {
           src =
-            prev.lib.sourceFilesBySuffices ./. [ ".cr" ".lock" ".yml" ".cue" ];
+            prev.lib.sourceFilesBySuffices ./. [ ".cr" ".lock" ".yml" ".cue" ".fixture" ];
         };
 
         bitte-ci-frontend =
