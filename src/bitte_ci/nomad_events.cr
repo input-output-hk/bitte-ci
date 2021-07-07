@@ -24,7 +24,9 @@ module BitteCI
           "index" => [index.to_s],
         }).to_s
 
-        HTTP::Client.get(nomad_url) do |res|
+        context = ssl_context(config) if nomad_url.scheme == "https"
+
+        HTTP::Client.get(nomad_url, tls: context) do |res|
           res.body_io.each_line do |line|
             next if line == "{}"
             j = Line.from_json(line)
@@ -65,6 +67,14 @@ module BitteCI
           end
         end
       end
+    end
+
+    def self.ssl_context(config)
+      OpenSSL::SSL::Context::Client.from_hash({
+        "ca"   => config.nomad_ssl_ca,
+        "cert" => config.nomad_ssl_cert,
+        "key"  => config.nomad_ssl_key,
+      })
     end
 
     class Line
