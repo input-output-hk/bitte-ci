@@ -20,7 +20,17 @@ in {
 
       nomadTokenFile = lib.mkOption { type = lib.types.str; };
 
-      nomadCaCert = lib.mkOption {
+      nomadSslCa = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+      };
+
+      nomadSslKey = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+      };
+
+      nomadSslCert = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
       };
@@ -50,8 +60,10 @@ in {
       github-token-file = cfg.githubTokenFile;
       github-user = cfg.githubUser;
       nomad-token-file = cfg.nomadTokenFile;
-    } // (lib.optionalAttrs (cfg.nomadCaCert != null) {
-      nomad-ca-cert = cfg.nomadCaCert;
+    } // (lib.optionalAttrs (cfg.nomadSslCa != null) {
+      nomad-ssl-ca = cfg.nomadSslCa;
+      nomad-ssl-key = cfg.nomadSslKey;
+      nomad-ssl-cert = cfg.nomadSslCert;
     })));
   in {
     systemd.services.bitte-ci-server = {

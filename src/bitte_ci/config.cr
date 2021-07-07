@@ -48,7 +48,13 @@ module BitteCI
     property nomad_token_file : Path?
 
     @[Option(help: "CA cert used for talking with Nomad when using HTTPS")]
-    property nomad_ca_cert : String?
+    property nomad_ssl_ca : String?
+
+    @[Option(help: "Key used for talking with Nomad when using HTTPS")]
+    property nomad_ssl_key : String?
+
+    @[Option(help: "Cert used for talking with Nomad when using HTTPS")]
+    property nomad_ssl_cert : String?
 
     def initialize(hash : Hash(String, String))
       {% for ivar in @type.instance_vars %}
@@ -70,7 +76,7 @@ module BitteCI
       {% end %}
     end
 
-    def convert(value : String | Nil, kind : (String |Nil).class)
+    def convert(value : String | Nil, kind : (String | Nil).class)
       value if value
     end
 

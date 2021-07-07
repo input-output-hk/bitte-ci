@@ -177,14 +177,9 @@ module BitteCI
       nomad_url = @config.nomad_base_url.dup
       nomad_url.path = "/v1/jobs"
 
-      context =
-        if nomad_url.scheme == "https"
-          OpenSSL::SSL::Context::Client.from_hash({"ca" => @config.nomad_ca_cert})
-        end
-
       res = HTTP::Client.post(
         nomad_url,
-        tls: context,
+        tls: (ssl_context if nomad_url.scheme == "https"),
         body: rendered.to_json,
         headers: headers,
       )
@@ -195,6 +190,14 @@ module BitteCI
       else
         raise "HTTP Error while trying to POST nomad job to #{nomad_url} : #{res.status.to_i} #{res.status_message}"
       end
+    end
+
+    def ssl_context
+      OpenSSL::SSL::Context::Client.from_hash({
+        "ca"   => @config.nomad_ssl_ca,
+        "cert" => @config.nomad_ssl_cert,
+        "key"  => @config.nomad_ssl_key,
+      })
     end
 
     def headers
