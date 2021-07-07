@@ -14,7 +14,7 @@ describe BitteCI do
       config["nomad_base_url"] = "http://127.0.0.1:4646"
       config["frontend_path"] = "result"
       config["github_user_content_base_url"] = "http://127.0.0.1:8080"
-      config["github_hook_secret"] = "secret"
+      config["github_hook_secret_file"] = File.join(__DIR__, "fixtures/github_hook_secret.fixture")
       config["github_user"] = "hello"
       config["github_token"] = "there"
     end

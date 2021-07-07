@@ -103,7 +103,7 @@ module BitteCI
     end
 
     def self.post_process(config)
-      %w[github_hook github_token nomad_token].each do |key|
+      %w[github_hook_secret github_token nomad_token].each do |key|
         key_file = "#{key}_file"
         if !config[key]? && config[key_file]?
           config[key] = File.read(config[key_file]).strip
