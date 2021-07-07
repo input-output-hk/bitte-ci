@@ -123,6 +123,8 @@ module BitteCI
       url.path = "/loki/api/v1/query_range"
       url.query = query.to_s
 
+      Log.info { "querying #{url}" }
+
       res = HTTP::Client.get(url)
 
       dec = LokiQueryRange.from_json(res.body)
