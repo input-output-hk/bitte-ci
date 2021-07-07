@@ -44,6 +44,7 @@ in {
       loki-base-url = cfg.lokiUrl;
       github-token-file = cfg.githubTokenFile;
       github-user = cfg.githubUser;
+      nomad-token-file = cfg.nomadTokenFile;
     });
   in {
     systemd.services.bitte-ci-server = {
