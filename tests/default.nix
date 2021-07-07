@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ lib, pkgs, inputs, ... }:
 let
   pr = pkgs.writeText "pr.json" (builtins.toJSON {
     pull_request = {
@@ -30,17 +30,69 @@ let
   });
 
   testJob = pkgs.writeShellScript "test.sh" ''
-    ${pkgs.bitte-ci}/bin/bitte-ci --queue --githubusercontent-url http://127.0.0.1:8080 < ${pr}
+    ${pkgs.bitte-ci}/bin/bitte-ci queue \
+      --github-user-content-base-url http://127.0.0.1:8080 \
+      --public-url http://example.com \
+      --postgres-url "postgres://bitte_ci@localhost:5432/bitte_ci" \
+      --github-user-content-base-url "http://localhost:8080" \
+      --nomad-base-url "http://localhost:4646" \
+      --public-url "http://example.com" \
+      --loki-base-url "http://localhost:3100" \
+      --github-hook-secret "oos0kahquaiNaiciz8MaeHohNgaejien" \
+      --github-user "tester" \
+      --github-token "token" \
+      --frontend-path ${pkgs.bitte-ci-frontend} \
+      < ${pr}
+
+    free -h
+
+    nomad node status
+    id="$(nomad node status | tail -1 | awk '{print $1}')"
+    nomad node status "$id"
+
+    nomad job status
   '';
 
   testFlake = pkgs.writeText "flake.nix" ''
     {
       description = "Test";
-      outputs = { self }: {
-        packages.x86_64-linux.hello = builtins.toFile "hello" "hello";
+      inputs = {
+        nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05";
       };
+      outputs = { self, nixpkgs }:
+        let pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        in {
+          packages.x86_64-linux = {
+            grafana-loki = pkgs.grafana-loki;
+            hello = pkgs.hello;
+          };
+        };
     }
   '';
+
+  testFlakeLock = pkgs.writeText "flake.lock" (builtins.toJSON {
+    nodes = {
+      nixpkgs = {
+        locked = {
+          lastModified = 1623961232;
+          narHash = "sha256-5X5v37GTBFdQnc3rvbSPJyAtO+/z1wHZF3Kz61g2Mx4=";
+          owner = "NixOS";
+          repo = "nixpkgs";
+          rev = "bad3ccd099ebe9a8aa017bda8500ab02787d90aa";
+          type = "github";
+        };
+        original = {
+          owner = "NixOS";
+          ref = "nixos-21.05";
+          repo = "nixpkgs";
+          type = "github";
+        };
+      };
+      root = { inputs = { nixpkgs = "nixpkgs"; }; };
+    };
+    root = "root";
+    version = 7;
+  });
 
   ciCue = pkgs.writeText "ci.cue" ''
     package ci
@@ -56,14 +108,26 @@ let
 
   fakeGithub = pkgs.writeText "github.rb" ''
     require "webrick"
+    require "json"
+
+    # ${inputs.self.legacyPackages.x86_64-linux.grafana-loki}
+    # ${inputs.self.legacyPackages.x86_64-linux.hello}
 
     server = WEBrick::HTTPServer.new(Port: 9090)
     trap('INT') { server.shutdown }
-    server.mount_proc "/" do |req, res|
+
+    server.mount_proc "/registry.json" do |req, res|
+      puts "Received registry request: #{req.inspect}"
+      res.body = {flakes: []}.to_json
+      res.status = 200
+    end
+
+    server.mount_proc "/github" do |req, res|
       puts "Received github status request: #{req.inspect}"
       res.body = "OK"
       res.status = 201
     end
+
     server.start
   '';
 in {
@@ -74,12 +138,28 @@ in {
       ci = {
         imports = [ ../modules/bitte-ci.nix ];
 
-        environment.systemPackages = with pkgs; [ curl ];
+        # Nomad exec driver is incompatible with cgroups v2
+        systemd.enableUnifiedCgroupHierarchy = false;
+        virtualisation.memorySize = 3 * 1024;
+        virtualisation.diskSize = 2 * 1024;
+
+        environment.systemPackages = with pkgs; [ curl gawk ];
+
+        nix = {
+          package = pkgs.nixFlakes;
+          registry.nixpkgs.flake = inputs.nixpkgs;
+          extraOptions = ''
+            experimental-features = nix-command flakes ca-references
+            show-trace = true
+            log-lines = 100
+            flake-registry = http://localhost:9090/registry.json
+          '';
+        };
 
         systemd.services.fakeGithub = {
           description = "Fake GitHub";
-          before = ["bitte-ci-server.service"];
-          wantedBy = ["multi-user.target"];
+          before = [ "bitte-ci-server.service" ];
+          wantedBy = [ "multi-user.target" ];
           path = with pkgs; [ ruby ];
           script = ''
             exec ruby ${fakeGithub}
@@ -97,12 +177,15 @@ in {
             mkdir -p /test-repo
             cd /test-repo
 
+            ln -s ${builtins.getFlake "github:NixOS/nixpkgs?rev=aea7242187f21a120fe73b5099c4167e12ec9aab"} nomad-nixpkgs
+
             git config --global init.defaultBranch master
             git config --global user.email "test@example.com"
             git config --global user.name "Test"
             git init
             cp ${ciCue} ci.cue
             cp ${testFlake} flake.nix
+            cp ${testFlakeLock} flake.lock
             git add .
             git commit -m 'inaugural commit'
 
@@ -130,16 +213,36 @@ in {
 
           bitte-ci = {
             enable = true;
-            dbUrl = "postgres://bitte_ci@localhost:5432/bitte_ci";
-            githubusercontentUrl = "http://localhost:8080";
+            postgresUrl = "postgres://bitte_ci@localhost:5432/bitte_ci";
+            githubUserContentUrl = "http://localhost:8080";
+            nomadUrl = "http://localhost:4646";
+            publicUrl = "http://example.com";
+            lokiUrl = "http://localhost:3100";
+            githubHookSecretFile =
+              builtins.toFile "secret" "oos0kahquaiNaiciz8MaeHohNgaejien";
+            githubUser = "tester";
+            githubTokenFile = builtins.toFile "secret" "token";
           };
 
           nomad = {
             enable = true;
+            enableDocker = false;
+            extraPackages = with pkgs; [ nixFlakes ];
+
+            # required for exec driver
+            dropPrivileges = false;
+
             settings = {
+              log_level = "DEBUG";
+              datacenter = "dc1";
               server = {
                 enabled = true;
                 bootstrap_expect = 1;
+              };
+
+              client = {
+                enabled = true;
+                reserved.memory = 256;
               };
             };
           };
@@ -211,7 +314,10 @@ in {
       ci.wait_for_open_port(8080)
       ci.wait_for_open_port(9090)
 
+      ci.sleep(10)
       ci.log(ci.succeed("${testJob}"))
+      ci.sleep(10)
+      ci.log(ci.succeed("nomad status bitte-ci"))
       ci.sleep(60)
     '';
   };

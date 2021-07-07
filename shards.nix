@@ -29,6 +29,12 @@
     rev = "f5dafc934a70e0ee2f246dddf3df44686f844da2";
     sha256 = "042n6qj8frhy7zh5swmvlb69rn1hnzdsf033xy9yz029zx9mi40k";
   };
+  habitat = {
+    owner = "luckyframework";
+    repo = "habitat";
+    rev = "v0.4.7";
+    sha256 = "0d183pnswgjwqg388zmnx7s41ai88ca96nl5cybi0z6icr5npw64";
+  };
   inflector = {
     owner = "anykeyh";
     repo = "inflector.cr";

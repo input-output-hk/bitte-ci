@@ -119,7 +119,7 @@ module BitteCI
         }
       )
 
-      url = @config.loki_url.dup
+      url = @config.loki_base_url.dup
       url.path = "/loki/api/v1/query_range"
       url.query = query.to_s
 
@@ -146,8 +146,7 @@ module BitteCI
 
       {type: "build", value: {build: build.simplify, logs: logs}}
     rescue e : JSON::ParseException
-      pp! e
-      pp! res.body if res
+      Log.error &.emit(e.inspect, body: res.body) if res
       sleep 1
     end
   end
@@ -157,12 +156,12 @@ module BitteCI
     channels = [] of Channel(String)
     start_control(control, channels)
 
-    PG.connect_listen config.db_url, "allocations", "github", "builds" do |n|
+    PG.connect_listen config.postgres_url, "allocations", "github", "builds" do |n|
       obj =
         case n.channel
         when "builds"
           build = Build.query.where { id == n.payload }.first
-          pp! build.send_github_status(user: github_user, token: github_token, target_url: config.public_url) if build
+          build.send_github_status(user: github_user, token: github_token, target_url: config.public_url) if build
           build
         when "pull_requests"
           PullRequest.query.where { id == n.payload }.first

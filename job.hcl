@@ -9,7 +9,7 @@ job "bitte-ci" {
       leader = true
 
       config {
-        flake = "@@FLAKE@@"
+        flake = "github:NixOS/nixpkgs/nixos-21.05#hello"
         command = "/bin/bash"
         args = ["/local/runner.sh"]
       }
@@ -62,7 +62,7 @@ job "bitte-ci" {
       driver = "exec"
 
       config {
-        flake = "github:input-output-hk/bitte#grafana-loki"
+        flake = "github:NixOS/nixpkgs/nixos-21.05#grafana-loki"
         command = "/bin/promtail"
         args = ["-config.file", "local/config.yaml"]
       }

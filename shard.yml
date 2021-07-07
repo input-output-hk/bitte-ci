@@ -18,3 +18,5 @@ dependencies:
   clear:
     github: anykeyh/clear
     branch: master
+  habitat:
+    github: luckyframework/habitat

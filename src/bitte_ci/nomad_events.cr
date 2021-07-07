@@ -8,7 +8,7 @@ module BitteCI
   module NomadEvents
     # TODO: refactor to use Clear
     def self.listen(config : Config)
-      DB.open(config.db_url.to_s) do |db|
+      DB.open(config.postgres_url.to_s) do |db|
         index = 0i64
 
         db.query "SELECT COALESCE(MAX(index), 0) from allocations;" do |rs|
@@ -17,14 +17,12 @@ module BitteCI
           end
         end
 
-        nomad_url = config.nomad_url.dup
+        nomad_url = config.nomad_base_url.dup
         nomad_url.path = "/v1/event/stream"
         nomad_url.query = URI::Params.new({
           "topic" => ["Allocation"],
           "index" => [index.to_s],
         }).to_s
-
-        pp! nomad_url
 
         HTTP::Client.get(nomad_url) do |res|
           res.body_io.each_line do |line|
@@ -38,7 +36,7 @@ module BitteCI
                   eval_id = event.payload.allocation.eval_id
                   status = event.payload.allocation.client_status
 
-                  pp! id, eval_id, j.index, status
+                  Log.info { "Updating allocation #{id} with #{status}" }
 
                   db.exec <<-SQL, id, eval_id, j.index, status
                     INSERT INTO allocations

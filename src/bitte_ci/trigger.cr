@@ -4,6 +4,8 @@ require "openssl/hmac"
 
 module BitteCI
   module Trigger
+    # Handles the incoming requests from GitHub and invokes the runner for
+    # things we care about.
     def self.handle(config, env)
       headers = env.request.headers
       body_io = env.request.body
@@ -13,7 +15,7 @@ module BitteCI
       when "star", "watch"
         Log.debug { "unhandled event: #{event}" }
       when "pull_request"
-        body = verify(config, headers, body_io) if body_io
+        body = verify_hmac(config, headers, body_io) if body_io
         if body
           Runner.run(body, config)
         else
@@ -24,10 +26,11 @@ module BitteCI
       end
     end
 
-    def self.verify(config, headers, body_io : IO)
+    # We verify that the hook body is actually coming from us.
+    def self.verify_hmac(config, headers, body_io : IO)
       body = body_io.gets_to_end
       signature = headers["X-Hub-Signature-256"][7..-1]
-      digest = OpenSSL::HMAC.hexdigest(OpenSSL::Algorithm::SHA256, config.secret, body)
+      digest = OpenSSL::HMAC.hexdigest(OpenSSL::Algorithm::SHA256, config.github_hook_secret, body)
       body if digest == signature
     end
   end

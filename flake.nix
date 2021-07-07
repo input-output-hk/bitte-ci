@@ -33,7 +33,8 @@
         };
 
         bitte-ci = prev.callPackage ./pkgs/bitte-ci {
-          src = prev.lib.sourceFilesBySuffices ./. [".cr" ".lock" ".yml" ".cue"];
+          src =
+            prev.lib.sourceFilesBySuffices ./. [ ".cr" ".lock" ".yml" ".cue" ];
         };
 
         bitte-ci-frontend =
@@ -45,7 +46,7 @@
 
         ngrok = prev.callPackage ./pkgs/ngrok { };
 
-        tests = prev.callPackage ./tests { };
+        tests = prev.callPackage ./tests { inherit inputs; };
 
         project = inputs.arion.lib.build {
           modules = [ ./arion-compose.nix ];
@@ -68,6 +69,21 @@
 
       devShell.x86_64-linux = pkgs.mkShell {
         DOCKER_HOST = "unix:///run/podman/podman.sock";
+
+        # requires https://github.com/NixOS/nix/pull/4983
+        # BITTE_CI_POSTGRES_URL = "postgres://postgres@127.0.0.1/bitte_ci";
+
+        BITTE_CI_FRONTEND_PATH = pkgs.bitte-ci-frontend;
+        BITTE_CI_PUBLIC_URL = "http://127.0.0.1:9292";
+        BITTE_CI_LOKI_BASE_URL = "http://127.0.0.1:3120";
+        BITTE_CI_NOMAD_BASE_URL = "http://127.0.0.1:4646";
+        BITTE_CI_GITHUB_USER_CONTENT_BASE_URL =
+          "https://raw.githubusercontent.com";
+        BITTE_CI_GITHUB_USER = "manveru";
+
+        shellHook = ''
+          export BITTE_CI_GITHUB_TOKEN="$(awk '/github.com/ {print $6;exit}' ~/.netrc)"
+        '';
 
         buildInputs = with pkgs; [
           pkgs.arion

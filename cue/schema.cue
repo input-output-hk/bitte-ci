@@ -9,6 +9,8 @@ import ("list")
 	enable:  *true | false
 	datacenters: *["dc1"] | (list.MinItems(1) & [...string])
 	vault: *false | true
+	cpu: *100 | uint
+	memory: *300 | uint
 }
 
 ci: {

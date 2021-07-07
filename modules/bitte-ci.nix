@@ -5,19 +5,32 @@ in {
     services.bitte-ci = {
       enable = lib.mkEnableOption "Enable Bitte CI";
 
-      dbUrl = lib.mkOption { type = lib.types.str; };
+      publicUrl = lib.mkOption { type = lib.types.str; };
 
-      nomadUrl = lib.mkOption {
-        type = lib.types.str;
-        default = "http://127.0.0.1:4646";
-      };
+      postgresUrl = lib.mkOption { type = lib.types.str; };
+
+      nomadUrl = lib.mkOption { type = lib.types.str; };
+
+      lokiUrl = lib.mkOption { type = lib.types.str; };
 
       frontendPath = lib.mkOption {
         type = lib.types.path;
         default = pkgs.bitte-ci-frontend;
       };
 
-      githubusercontentUrl = lib.mkOption {
+      githubHookSecretFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+      };
+
+      githubTokenFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+      };
+
+      githubUser = lib.mkOption { type = lib.types.str; };
+
+      githubUserContentUrl = lib.mkOption {
         type = lib.types.str;
         default = "https://raw.githubusercontent.com";
       };
@@ -26,10 +39,15 @@ in {
 
   config = lib.mkIf cfg.enable (let
     flags = builtins.toString (lib.cli.toGNUCommandLine { } {
-      db-url = cfg.dbUrl;
+      public-url = cfg.publicUrl;
+      postgres-url = cfg.postgresUrl;
       frontend-path = builtins.toString cfg.frontendPath;
-      githubusercontent-url = cfg.githubusercontentUrl;
-      nomad-url = cfg.nomadUrl;
+      github-user-content-base-url = cfg.githubUserContentUrl;
+      github-hook-secret-file = cfg.githubHookSecretFile;
+      nomad-base-url = cfg.nomadUrl;
+      loki-base-url = cfg.lokiUrl;
+      github-token-file = cfg.githubTokenFile;
+      github-user = cfg.githubUser;
     });
   in {
     systemd.services.bitte-ci-server = {
@@ -43,7 +61,7 @@ in {
         GITHUB_TOKEN = "dummy";
       };
       script = ''
-        exec bitte-ci --server ${flags}
+        exec bitte-ci server ${flags}
       '';
     };
 
@@ -58,7 +76,7 @@ in {
       wantedBy = [ "multi-user.target" ];
       path = with pkgs; [ bitte-ci ];
       script = ''
-        exec bitte-ci --listen ${flags}
+        exec bitte-ci listen ${flags}
       '';
     };
 
@@ -72,7 +90,7 @@ in {
       ];
       path = with pkgs; [ bitte-ci ];
       script = ''
-        exec bitte-ci --migrate ${flags}
+        exec bitte-ci migrate ${flags}
       '';
       serviceConfig.Type = "oneshot";
       serviceConfig.RemainAfterExit = true;

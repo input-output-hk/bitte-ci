@@ -20,6 +20,10 @@ shards:
     git: https://github.com/anykeyh/generate.cr.git
     version: 0.1.0+git.commit.f5dafc934a70e0ee2f246dddf3df44686f844da2
 
+  habitat:
+    git: https://github.com/luckyframework/habitat.git
+    version: 0.4.7
+
   inflector:
     git: https://github.com/anykeyh/inflector.cr.git
     version: 0.1.8+git.commit.dc5c898b0a834617d8b3ff73ac5a2239bd9fc019
@@ -39,8 +43,4 @@ shards:
   radix:
     git: https://github.com/luislavena/radix.git
     version: 0.4.1
-
-  toml:
-    git: https://github.com/manveru/toml.cr.git
-    version: 0.7.0+git.commit.d7dce13e42f02e320f9f1192ce900650ef1e4cdd
 

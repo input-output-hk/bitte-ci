@@ -1,6 +1,7 @@
 require "json"
 require "http/client"
 require "./uuid"
+require "./job_config"
 
 Second = 1_000_000_000u64
 Minute = Second * 60
@@ -56,7 +57,7 @@ module BitteCI
 
       Log.info { "Exported CUE" }
 
-      BitteCI::JobConfig.from_json(mem.to_s)
+      JobConfig.from_json(mem.to_s)
     ensure
       [pr_tmp_cue, pr_tmp_json, pr_tmp_schema, pr_tmp_ci].each do |file|
         File.delete file if file && File.file?(file)
@@ -66,7 +67,7 @@ module BitteCI
     def fetch_ci_cue
       full_name = @pr.base.repo.full_name
       sha = @pr.base.sha
-      ci_cue_url = @config.githubusercontent_url.dup
+      ci_cue_url = @config.github_user_content_base_url.dup
       ci_cue_url.path = "/#{full_name}/#{sha}/ci.cue"
 
       res = HTTP::Client.get(ci_cue_url)
@@ -112,30 +113,6 @@ module BitteCI
     end
   end
 
-  class JobConfig
-    include JSON::Serializable
-
-    property ci : CI
-
-    class CI
-      include JSON::Serializable
-
-      property version : UInt8
-      property steps : Array(Step)
-    end
-
-    class Step
-      include JSON::Serializable
-
-      property label : String
-      property command : String | Array(String)
-      property enable : Bool
-      property flake : String
-      property datacenters : Array(String)
-      property vault : Bool
-    end
-  end
-
   class NomadJobPost
     include JSON::Serializable
 
@@ -169,7 +146,9 @@ module BitteCI
     def queue!
       post = post_job!
 
-      DB.open(@config.db_url) do |db|
+      pp! post
+
+      DB.open(@config.postgres_url) do |db|
         db.transaction do
           db.exec <<-SQL, @pr.id, @raw
             INSERT INTO pull_requests (id, data) VALUES ($1, $2)
@@ -191,16 +170,17 @@ module BitteCI
     end
 
     def post_job!
+      Log.info { "Submitting job to Nomad" }
       rendered = {Job: job}
 
-      nomad_url = @config.nomad_url.dup
+      nomad_url = @config.nomad_base_url.dup
       nomad_url.path = "/v1/jobs"
 
       res = HTTP::Client.post(
         nomad_url,
         body: rendered.to_json,
         headers: HTTP::Headers{
-          "X-Nomad-Token" => ["TODO"],
+          "X-Nomad-Token" => [@config.nomad_token],
         }
       )
 
@@ -222,7 +202,7 @@ module BitteCI
         ID:          "bitte-ci",
         Name:        "bitte-ci",
         Type:        "batch",
-        Priority:    50,
+        Priority:    @step.priority,
         Datacenters: @step.datacenters,
         TaskGroups:  [
           {
@@ -273,8 +253,8 @@ module BitteCI
         },
         KillSignal: "SIGINT",
         Resources:  {
-          CPU:      3300,
-          MemoryMB: 8192,
+          CPU:      @step.cpu,
+          MemoryMB: @step.memory,
         },
         RestartPolicy: {
           Interval: Second * 60,
@@ -309,7 +289,7 @@ module BitteCI
         Name:   "promtail",
         Driver: "exec",
         Config: {
-          flake:   "github:input-output-hk/bitte#grafana-loki",
+          flake:   @config.promtail_flake,
           command: "/bin/promtail",
           args:    ["-config.file", "local/config.yaml"],
         },
