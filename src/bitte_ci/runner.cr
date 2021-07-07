@@ -19,6 +19,8 @@ module BitteCI
             in String
               input
             end
+      Log.info { "received PR" }
+      Log.info { raw }
       hook = GithubHook.from_json(raw)
       new(hook.pull_request, raw, config).run
     end
