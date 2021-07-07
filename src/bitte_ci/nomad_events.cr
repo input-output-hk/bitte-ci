@@ -31,47 +31,51 @@ module BitteCI
         context = ssl_context(config) if nomad_url.scheme == "https"
 
         HTTP::Client.get(nomad_url, headers: headers, tls: context) do |res|
-          res.body_io.each_line do |line|
-            Log.info { line }
-            next if line == "{}"
-            j = Line.from_json(line)
-            j.events.each do |event|
-              case event
-              when Allocation
-                db.transaction do
-                  id = event.payload.allocation.id
-                  eval_id = event.payload.allocation.eval_id
-                  status = event.payload.allocation.client_status
+          res.body_io.each_line { |line| handle_line(db, line) }
+        end
+      end
+    end
 
-                  Log.info { "Updating allocation #{id} with #{status}" }
+    def self.handle_line(db, line)
+      return if line == "{}"
+      j = Line.from_json(line)
+      j.events.each do |event|
+        case event
+        when Allocation
+          db.transaction do
+            id = event.payload.allocation.id
+            eval_id = event.payload.allocation.eval_id
+            status = event.payload.allocation.client_status
 
-                  db.exec <<-SQL, id, eval_id, j.index, status
-                    INSERT INTO allocations
-                      (id, eval_id, index, client_status, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())
-                    ON CONFLICT (id) DO
-                      UPDATE SET index = $3, updated_at = NOW(), client_status = $4;
-                  SQL
+            Log.info { "Updating allocation #{id} with #{status}" }
 
-                  db.exec "SELECT pg_notify($1, $2)", "allocations", id
+            db.exec <<-SQL, id, eval_id, j.index, status
+              INSERT INTO allocations
+                (id, eval_id, index, client_status, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())
+              ON CONFLICT (id) DO
+                UPDATE SET index = $3, updated_at = NOW(), client_status = $4;
+            SQL
 
-                  case status
-                  when "failed", "complete"
-                    db.exec <<-SQL, eval_id, status
-                      UPDATE builds SET build_status = $2, updated_at = NOW(), finished_at = NOW() WHERE id = $1;
-                    SQL
-                  else
-                    db.exec <<-SQL, eval_id, status
-                      UPDATE builds SET build_status = $2, updated_at = NOW() WHERE id = $1;
-                    SQL
-                  end
+            db.exec "SELECT pg_notify($1, $2)", "allocations", id
 
-                  db.exec "SELECT pg_notify($1, $2)", "builds", eval_id
-                end
-              end
+            case status
+            when "failed", "complete"
+              db.exec <<-SQL, eval_id, status
+                UPDATE builds SET build_status = $2, updated_at = NOW(), finished_at = NOW() WHERE id = $1;
+              SQL
+            else
+              db.exec <<-SQL, eval_id, status
+                UPDATE builds SET build_status = $2, updated_at = NOW() WHERE id = $1;
+              SQL
             end
+
+            db.exec "SELECT pg_notify($1, $2)", "builds", eval_id
           end
         end
       end
+    rescue e : JSON::ParseException
+      Log.error { "Couldn't parse line" }
+      Log.error { line }
     end
 
     def self.ssl_context(config)
