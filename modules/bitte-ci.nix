@@ -18,15 +18,11 @@ in {
         default = pkgs.bitte-ci-frontend;
       };
 
-      githubHookSecretFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-      };
+      nomadTokenFile = lib.mkOption { type = lib.types.str; };
 
-      githubTokenFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-      };
+      githubHookSecretFile = lib.mkOption { type = lib.types.str; };
+
+      githubTokenFile = lib.mkOption { type = lib.types.str; };
 
       githubUser = lib.mkOption { type = lib.types.str; };
 
