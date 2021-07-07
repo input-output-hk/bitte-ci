@@ -226,15 +226,6 @@ module BitteCI
           {
             Name:  group_name,
             Count: 1,
-            Env:   {
-              "PATH"          => "/bin",
-              "SSL_CERT_FILE" => "/etc/ssl/certs/ca-bundle.crt",
-              "SHA"           => @pr.head.sha,
-              "CLONE_URL"     => @pr.head.repo.clone_url,
-              "LABEL"         => @pr.head.label,
-              "REF"           => @pr.head.ref,
-              "FULL_NAME"     => @pr.base.repo.full_name,
-            },
             Tasks: [
               runner, promtail,
             ],
@@ -267,7 +258,13 @@ module BitteCI
           args:    ["/local/runner.sh"] + [@step.command].flatten,
         },
         Env: {
-          "PATH" => "/bin",
+          "PATH"          => "/bin",
+          "SSL_CERT_FILE" => "/etc/ssl/certs/ca-bundle.crt",
+          "SHA"           => @pr.head.sha,
+          "CLONE_URL"     => @pr.head.repo.clone_url,
+          "LABEL"         => @pr.head.label,
+          "REF"           => @pr.head.ref,
+          "FULL_NAME"     => @pr.base.repo.full_name,
         },
         KillSignal: "SIGINT",
         Resources:  {
