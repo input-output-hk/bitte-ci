@@ -28,6 +28,7 @@ module BitteCI
 
         HTTP::Client.get(nomad_url, tls: context) do |res|
           res.body_io.each_line do |line|
+            Log.info { line }
             next if line == "{}"
             j = Line.from_json(line)
             j.events.each do |event|
