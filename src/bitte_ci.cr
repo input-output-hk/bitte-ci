@@ -46,11 +46,7 @@ unless ENV["BITTE_CI_SPEC"]?
   in BitteCI::Cmd::Serve
     Log.info { "Starting server" }
     Clear::SQL.init(config.postgres_url.to_s)
-    BitteCI.start(
-      config: config,
-      github_user: ENV["GITHUB_USER"],
-      github_token: ENV["GITHUB_TOKEN"],
-    )
+    BitteCI.start(config: config)
     Kemal.run port: 9494
   in BitteCI::Cmd::Migrate
     Log.info { "Starting migration" }

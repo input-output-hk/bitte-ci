@@ -153,7 +153,7 @@ module BitteCI
     end
   end
 
-  def self.start(config : Config, github_user : String, github_token : String)
+  def self.start(config : Config)
     control = ChannelControl.new(10)
     channels = [] of Channel(String)
     start_control(control, channels)
@@ -163,7 +163,11 @@ module BitteCI
         case n.channel
         when "builds"
           build = Build.query.where { id == n.payload }.first
-          build.send_github_status(user: github_user, token: github_token, target_url: config.public_url) if build
+          build.send_github_status(
+            user: config.github_user,
+            token: config.github_token,
+            target_url: config.public_url
+          ) if build
           build
         when "pull_requests"
           PullRequest.query.where { id == n.payload }.first
