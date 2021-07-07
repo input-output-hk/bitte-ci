@@ -72,10 +72,6 @@ in {
         [ "bitte-ci-migrate.service" "loki.service" "postgresql.service" ];
       wantedBy = [ "multi-user.target" ];
       path = with pkgs; [ bitte-ci ];
-      environment = {
-        GITHUB_USER = "dummy";
-        GITHUB_TOKEN = "dummy";
-      };
       script = ''
         exec bitte-ci server ${flags}
       '';
