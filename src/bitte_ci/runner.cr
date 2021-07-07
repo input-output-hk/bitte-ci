@@ -351,7 +351,7 @@ module BitteCI
       positions:
         filename: /local/positions.yaml
       client:
-        url: http://127.0.0.1:3100/loki/api/v1/push
+        url: '#{@config.loki_base_url}/loki/api/v1/push'
       scrape_configs:
       - job_name: '#{@loki_id}'
         pipeline_stages: null
