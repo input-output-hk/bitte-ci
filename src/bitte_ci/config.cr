@@ -47,6 +47,9 @@ module BitteCI
     @[Option(help: "Read the Nomad token from this file")]
     property nomad_token_file : Path?
 
+    @[Option(help: "CA cert used for talking with Nomad when using HTTPS")]
+    property nomad_ca_cert : String?
+
     def initialize(hash : Hash(String, String))
       {% for ivar in @type.instance_vars %}
         env = "BITTE_CI_{{ivar.id}}".upcase
@@ -65,6 +68,10 @@ module BitteCI
 
         @{{ivar.id}} = convert(value, {{ivar.type}})
       {% end %}
+    end
+
+    def convert(value : String | Nil, kind : (String |Nil).class)
+      value if value
     end
 
     def convert(value : String, kind : URI.class)

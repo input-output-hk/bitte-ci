@@ -173,17 +173,20 @@ module BitteCI
 
     def post_job!
       Log.info { "Submitting job to Nomad" }
-      rendered = {Job: job}
 
       nomad_url = @config.nomad_base_url.dup
       nomad_url.path = "/v1/jobs"
 
+      context =
+        if nomad_url.scheme == "https"
+          OpenSSL::SSL::Context::Client.from_hash({"ca" => @config.nomad_ca_cert})
+        end
+
       res = HTTP::Client.post(
         nomad_url,
+        tls: context,
         body: rendered.to_json,
-        headers: HTTP::Headers{
-          "X-Nomad-Token" => [@config.nomad_token],
-        }
+        headers: headers,
       )
 
       case res.status
@@ -192,6 +195,16 @@ module BitteCI
       else
         raise "HTTP Error while trying to POST nomad job to #{nomad_url} : #{res.status.to_i} #{res.status_message}"
       end
+    end
+
+    def headers
+      HTTP::Headers{
+        "X-Nomad-Token" => [@config.nomad_token],
+      }
+    end
+
+    def rendered
+      {Job: job}
     end
 
     def group_name

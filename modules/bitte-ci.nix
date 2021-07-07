@@ -20,6 +20,11 @@ in {
 
       nomadTokenFile = lib.mkOption { type = lib.types.str; };
 
+      nomadCaCert = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+      };
+
       githubHookSecretFile = lib.mkOption { type = lib.types.str; };
 
       githubTokenFile = lib.mkOption { type = lib.types.str; };
@@ -34,7 +39,7 @@ in {
   };
 
   config = lib.mkIf cfg.enable (let
-    flags = builtins.toString (lib.cli.toGNUCommandLine { } {
+    flags = builtins.toString (lib.cli.toGNUCommandLine { } ({
       public-url = cfg.publicUrl;
       postgres-url = cfg.postgresUrl;
       frontend-path = builtins.toString cfg.frontendPath;
@@ -45,7 +50,9 @@ in {
       github-token-file = cfg.githubTokenFile;
       github-user = cfg.githubUser;
       nomad-token-file = cfg.nomadTokenFile;
-    });
+    } // (lib.optionalAttrs (cfg.nomadCaCert != null) {
+      nomad-ca-cert = cfg.nomadCaCert;
+    })));
   in {
     systemd.services.bitte-ci-server = {
       description = "Basic server and frontend for the Bitte CI";

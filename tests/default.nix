@@ -221,7 +221,8 @@ in {
             githubHookSecretFile =
               builtins.toFile "secret" "oos0kahquaiNaiciz8MaeHohNgaejien";
             githubUser = "tester";
-            githubTokenFile = builtins.toFile "secret" "token";
+            githubTokenFile = builtins.toFile "github" "token";
+            nomadTokenFile = builtins.toFile "nomad" "secret";
           };
 
           nomad = {
