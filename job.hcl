@@ -9,7 +9,14 @@ job "bitte-ci" {
       leader = true
 
       config {
-        flake = "github:NixOS/nixpkgs/nixos-21.05#hello"
+        flake_deps = [
+          "github:NixOS/nixpkgs/nixos-21.05#bashInteractive",
+          "github:NixOS/nixpkgs/nixos-21.05#coreutils",
+          "github:NixOS/nixpkgs/nixos-21.05#cacert",
+          "github:NixOS/nixpkgs/nixos-21.05#gnugrep",
+          "github:NixOS/nixpkgs/nixos-21.05#hello",
+          "github:NixOS/nixpkgs/nixos-21.05#git",
+        ]
         command = "/bin/bash"
         args = ["/local/runner.sh"]
       }

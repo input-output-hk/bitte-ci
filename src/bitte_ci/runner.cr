@@ -253,9 +253,9 @@ module BitteCI
         Name:   "runner",
         Driver: "exec",
         Config: {
-          flake:   @step.flake,
-          command: "/bin/bash",
-          args:    ["/local/runner.sh"] + [@step.command].flatten,
+          flake_deps: @step.flakes,
+          command:    "/bin/bash",
+          args:       ["/local/runner.sh"] + [@step.command].flatten,
         },
         Env: {
           "PATH"          => "/bin",
