@@ -4,7 +4,7 @@ import ("list")
 
 #step: {
 	label:   string
-	flakes:  list.MinItems(1) & [...string]
+	flakes:  [string, ...string] & list.MinItems(1)
 	command: string | (list.MinItems(1) & [...string])
 	enable:  *true | false
 	datacenters: *["dc1"] | (list.MinItems(1) & [...string])
