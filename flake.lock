@@ -50,11 +50,11 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1625693092,
-        "narHash": "sha256-tyex4/9EmCuMYAb5BbZJifzshnyWnMW2JtPHRYZdTlA=",
+        "lastModified": 1626187366,
+        "narHash": "sha256-VKIBXUxjmB5JQ1gdReWBypAyyx51BeNveXlnJBqH6iU=",
         "owner": "input-output-hk",
         "repo": "bitte-ci-frontend",
-        "rev": "bceced7e3c19df82fb82bcf3d783c0b6a5229cdc",
+        "rev": "c7d361f84524327b184b32194c115589defec622",
         "type": "github"
       },
       "original": {
