@@ -92,7 +92,7 @@
           reproxy
           ngrok
 
-          cue
+          inputs.bitte.packages.x86_64-linux.cue
 
           crystal
           shards
