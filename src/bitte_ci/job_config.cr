@@ -19,8 +19,7 @@ module BitteCI
       property label : String
       property command : String | Array(String)
       property enable : Bool
-      property flakes : Array(String)
-      property datacenters : Array(String)
+      property flakes : Hash(String, Array(String))
       property vault : Bool
       property cpu : UInt32 = 100
       property memory : UInt32 = 300

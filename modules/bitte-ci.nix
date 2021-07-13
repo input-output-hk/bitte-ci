@@ -35,6 +35,10 @@ in {
         default = null;
       };
 
+      nomadDatacenters = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+      };
+
       githubHookSecretFile = lib.mkOption { type = lib.types.str; };
 
       githubTokenFile = lib.mkOption { type = lib.types.str; };
@@ -60,6 +64,7 @@ in {
       github-token-file = cfg.githubTokenFile;
       github-user = cfg.githubUser;
       nomad-token-file = cfg.nomadTokenFile;
+      nomad-datacenters = lib.concatStringsSep "," cfg.nomadDatacenters;
     } // (lib.optionalAttrs (cfg.nomadSslCa != null) {
       nomad-ssl-ca = cfg.nomadSslCa;
       nomad-ssl-key = cfg.nomadSslKey;

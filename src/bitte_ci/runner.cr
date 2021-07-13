@@ -1,4 +1,5 @@
 require "json"
+require "yaml"
 require "http/client"
 require "./uuid"
 require "./job_config"
@@ -221,7 +222,7 @@ module BitteCI
         Name:        "bitte-ci",
         Type:        "batch",
         Priority:    @step.priority,
-        Datacenters: @step.datacenters,
+        Datacenters: @config.nomad_datacenters,
         TaskGroups:  [
           {
             Name:  group_name,
@@ -248,12 +249,19 @@ module BitteCI
       }
     end
 
+    # combine the required dependencies for the runner.sh with
+    def flake_deps
+      deps = %w[bashInteractive coreutils cacert gnugrep git].map { |a| "#{@config.runner_flake}##{a}" }
+      original = @step.flakes.flat_map { |k, vs| vs.map { |v| "#{k}##{v}" } }
+      (deps + original).uniq
+    end
+
     def runner
       {
         Name:   "runner",
         Driver: "exec",
         Config: {
-          flake_deps: @step.flakes,
+          flake_deps: flake_deps,
           command:    "/bin/bash",
           args:       ["/local/runner.sh"] + [@step.command].flatten,
         },
@@ -304,9 +312,13 @@ module BitteCI
         Name:   "promtail",
         Driver: "exec",
         Config: {
-          flake:   @config.promtail_flake,
+          flake:   @config.runner_flake.to_s + "#grafana-loki",
           command: "/bin/promtail",
           args:    ["-config.file", "local/config.yaml"],
+        },
+        Lifecycle: {
+          Hook:    "prestart",
+          Sidecar: true,
         },
         KillSignal: "SIGINT",
         Resources:  {
@@ -344,32 +356,26 @@ module BitteCI
     end
 
     def promtail_config
-      <<-PROMTAIL
-      server:
-        http_listen_port: 0
-        grpc_listen_port: 0
-      positions:
-        filename: /local/positions.yaml
-      client:
-        url: '#{@config.loki_base_url}/loki/api/v1/push'
-      scrape_configs:
-      - job_name: '#{@loki_id}'
-        pipeline_stages: null
-        static_configs:
-        - labels:
-            nomad_alloc_id: '{{ env "NOMAD_ALLOC_ID" }}'
-            nomad_alloc_index: '{{ env "NOMAD_ALLOC_INDEX" }}'
-            nomad_alloc_name: '{{ env "NOMAD_ALLOC_NAME" }}'
-            nomad_dc: '{{ env "NOMAD_DC" }}'
-            nomad_group_name: '{{ env "NOMAD_GROUP_NAME" }}'
-            nomad_job_id: '{{ env "NOMAD_JOB_ID" }}'
-            nomad_job_name: '{{ env "NOMAD_JOB_NAME" }}'
-            nomad_job_parent_id: '{{ env "NOMAD_JOB_PARENT_ID" }}'
-            nomad_namespace: '{{ env "NOMAD_NAMESPACE" }}'
-            nomad_region: '{{ env "NOMAD_REGION" }}'
-            bitte_ci_id: '#{@loki_id}'
-            __path__: /alloc/logs/*.std*.[0-9]*
-      PROMTAIL
+      nomad_labels = %w[alloc_id alloc_index alloc_name dc group_name job_id job_name job_parent_id namespace region]
+      env_labels = nomad_labels.map { |label| ["nomad_#{label}", %({{ env "NOMAD_#{label.upcase}" }})] }.to_h
+      env_labels["bitte_ci_id"] = @loki_id.to_s
+      env_labels["__path__"] = "/alloc/logs/*.std*.[0-9]*"
+
+      {
+        server: {
+          http_listen_port: 0,
+          grpc_listen_port: 0,
+        },
+        positions:      {filename: "/local/positions.yaml"},
+        client:         {url: "#{@config.loki_base_url}/loki/api/v1/push"},
+        scrape_configs: [
+          {
+            job_name:        @loki_id.to_s,
+            pipeline_stages: nil,
+            static_configs:  [{labels: env_labels}],
+          },
+        ],
+      }.to_yaml
     end
   end
 end

@@ -17,6 +17,7 @@ describe BitteCI do
       config["github_hook_secret_file"] = File.join(__DIR__, "fixtures/github_hook_secret.fixture")
       config["github_user"] = "hello"
       config["github_token"] = "there"
+      config["nomad_datacenters"] = "dc0"
     end
 
     c.public_url.should eq(URI.parse(public_url))
@@ -43,6 +44,7 @@ describe BitteCI do
       config["github_user"] = "hello"
       config["github_token"] = "there"
       config["nomad_token"] = "letmein"
+      config["nomad_datacenters"] = "dc0"
     end
 
     conn = BitteCI::Connection.new(socket, control, final_config).run

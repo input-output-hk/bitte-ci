@@ -12,7 +12,7 @@ module BitteCI
       event = headers["X-GitHub-Event"]
 
       case event
-      when "star", "watch"
+      when "star", "watch", "status"
         Log.debug { "unhandled event: #{event}" }
       when "pull_request"
         body = verify_hmac(config, headers, body_io) if body_io
@@ -22,7 +22,7 @@ module BitteCI
           Log.error { "HMAC Signature doesn't match. Verify the github hook and secret configured in bitte-ci match!" }
         end
       else
-        Log.debug { "unknown event: #{event}" }
+        Log.info { "unknown event: #{event}" }
       end
     end
 

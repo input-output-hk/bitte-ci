@@ -65,6 +65,7 @@ module BitteCI
       end
 
       @socket.on_message do |body|
+        pp! body
         msg = Msg.from_json(body)
 
         case msg.channel
@@ -109,6 +110,9 @@ module BitteCI
     def on_build(id : UUID)
       build = Build.query.where { var("id") == id }.first
       return unless build
+
+      # nomad_alloc = get_nomad_alloc(build.id)
+      # path=/v1/client/allocation/89f9a5ac-ef2a-dff8-253c-2b2fa0509fa1/stats
 
       query = URI::Params.new(
         {
@@ -182,9 +186,10 @@ module BitteCI
       Connection.new(socket, control, config).run
     end
 
-    public_folder config.frontend_path
+    frontend_path = File.expand_path(config.frontend_path, home: true)
 
-    index_html = File.read(File.join(config.frontend_path, "index.html"))
+    public_folder frontend_path
+    index_html = File.read(File.join(frontend_path, "index.html"))
 
     get "/" do
       index_html

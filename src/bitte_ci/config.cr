@@ -5,6 +5,9 @@ module BitteCI
     annotation Option
     end
 
+    @[Option(help: "Config file for Bitte CI (JSON)")]
+    property config : Path?
+
     @[Option(help: "Base URL under which this server is reachable e.g. http://example.com")]
     property public_url : URI
 
@@ -38,8 +41,8 @@ module BitteCI
     @[Option(help: "Read the GitHub hook secret from this file")]
     property github_hook_secret_file : Path?
 
-    @[Option(help: "Flake to use for promtail")]
-    property promtail_flake : URI = URI.parse("github:NixOS/nixpkgs/nixos-21.05#grafana-loki")
+    @[Option(help: "Build runner dependencies from thjs flake")]
+    property runner_flake : URI = URI.parse("github:NixOS/nixpkgs/nixos-21.05")
 
     @[Option(help: "Nomad token used for job submission")]
     property nomad_token : String
@@ -55,6 +58,9 @@ module BitteCI
 
     @[Option(help: "Cert used for talking with Nomad when using HTTPS")]
     property nomad_ssl_cert : String?
+
+    @[Option(help: "Nomad datacenters to run the jobs in (comma separated)")]
+    property nomad_datacenters : Array(String)
 
     def initialize(hash : Hash(String, String))
       {% for ivar in @type.instance_vars %}
@@ -74,6 +80,14 @@ module BitteCI
 
         @{{ivar.id}} = convert(value, {{ivar.type}})
       {% end %}
+    end
+
+    def self.from_config_file(filename : Path)
+      from_json(filename)
+    end
+
+    def convert(value : String, kind : Array(String).class)
+      value.split(',')
     end
 
     def convert(value : String | Nil, kind : (String | Nil).class)
@@ -109,10 +123,26 @@ module BitteCI
     end
 
     def self.configure
-      config = Hash(String, String).new
-      yield(config)
-      post_process(config)
-      new(config)
+      flag_config = Hash(String, String).new
+      file_config = Hash(String, String).new
+
+      yield(flag_config)
+
+      pre_process(flag_config, file_config)
+
+      merged_config = file_config.merge(flag_config)
+      post_process(merged_config)
+
+      new(merged_config)
+    end
+
+    def self.pre_process(flag_config, file_config)
+      file = flag_config["config"]?
+      return unless file
+
+      JSON.parse(File.read(file)).as_h.each do |key, value|
+        file_config[key] = value.as_s
+      end
     end
 
     def self.post_process(config)

@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05";
-    bitte.url = "github:input-output-hk/bitte";
+    bitte.url = "github:input-output-hk/bitte/nix-driver-with-profiles";
     rust = {
       url = "github:input-output-hk/rust.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -33,8 +33,13 @@
         };
 
         bitte-ci = prev.callPackage ./pkgs/bitte-ci {
-          src =
-            prev.lib.sourceFilesBySuffices ./. [ ".cr" ".lock" ".yml" ".cue" ".fixture" ];
+          src = prev.lib.sourceFilesBySuffices ./. [
+            ".cr"
+            ".lock"
+            ".yml"
+            ".cue"
+            ".fixture"
+          ];
         };
 
         bitte-ci-frontend =
@@ -46,7 +51,7 @@
 
         ngrok = prev.callPackage ./pkgs/ngrok { };
 
-        tests = prev.callPackage ./tests { inherit inputs; };
+        tests = final.callPackage ./tests { inherit inputs; };
 
         project = inputs.arion.lib.build {
           modules = [ ./arion-compose.nix ];
@@ -74,12 +79,6 @@
         # BITTE_CI_POSTGRES_URL = "postgres://postgres@127.0.0.1/bitte_ci";
 
         BITTE_CI_FRONTEND_PATH = pkgs.bitte-ci-frontend;
-        BITTE_CI_PUBLIC_URL = "http://127.0.0.1:9292";
-        BITTE_CI_LOKI_BASE_URL = "http://127.0.0.1:3120";
-        BITTE_CI_NOMAD_BASE_URL = "http://127.0.0.1:4646";
-        BITTE_CI_GITHUB_USER_CONTENT_BASE_URL =
-          "https://raw.githubusercontent.com";
-        BITTE_CI_GITHUB_USER = "manveru";
 
         shellHook = ''
           export BITTE_CI_GITHUB_TOKEN="$(awk '/github.com/ {print $6;exit}' ~/.netrc)"
