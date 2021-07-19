@@ -5,7 +5,6 @@ require "option_parser"
 module SimpleConfig
   module Configuration
     def initialize(hash : Hash(String, String), file : String?)
-      pp! hash
       json =
         if file
           JSON.parse(File.read(file))

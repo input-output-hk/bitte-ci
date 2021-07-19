@@ -1,12 +1,12 @@
 require "./spec_helper"
 
 describe BitteCI do
-  it "is configurable" do
-    public_url = "http://example.com"
-    loki_url = "http://loki"
-    nomad_token_file = File.join(__DIR__, "fixtures/nomad_token.fixture")
-    ENV["LOKI_BASE_URL"] = loki_url
+  public_url = "http://example.com"
+  loki_url = "http://loki"
+  nomad_token_file = File.join(__DIR__, "fixtures/nomad_token.fixture")
+  ENV["LOKI_BASE_URL"] = loki_url
 
+  it "is configurable" do
     c = BitteCI::Server::Config.configure do |config|
       config["nomad_token_file"] = nomad_token_file
       config["frontend_path"] = "frontend"
