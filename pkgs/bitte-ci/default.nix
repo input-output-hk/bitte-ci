@@ -3,10 +3,14 @@ crystal.buildCrystalPackage {
   pname = "bitte-ci";
   version = "0.1.0";
   format = "crystal";
+
   inherit src;
+
   buildInputs = [ openssl gmp ];
   nativeBuildInputs = [ makeWrapper ];
+
   shardsFile = ../../shards.nix;
+
   crystalBinaries.bitte-ci = {
     src = "src/bitte_ci.cr";
     options = [ "--debug" "--progress" ];

@@ -15,9 +15,9 @@ module BitteCI
       when "star", "watch", "status"
         Log.debug { "unhandled event: #{event}" }
       when "pull_request"
-        body = verify_hmac(config, headers, body_io) if body_io
+        body = verify_hmac(config.github_hook_secret, headers, body_io) if body_io
         if body
-          Runner.run(body, config)
+          Runner.run(body, config.for_runner)
         else
           Log.error { "HMAC Signature doesn't match. Verify the github hook and secret configured in bitte-ci match!" }
         end
@@ -27,10 +27,10 @@ module BitteCI
     end
 
     # We verify that the hook body is actually coming from us.
-    def self.verify_hmac(config, headers, body_io : IO)
+    def self.verify_hmac(secret, headers, body_io : IO)
       body = body_io.gets_to_end
       signature = headers["X-Hub-Signature-256"][7..-1]
-      digest = OpenSSL::HMAC.hexdigest(OpenSSL::Algorithm::SHA256, config.github_hook_secret, body)
+      digest = OpenSSL::HMAC.hexdigest(OpenSSL::Algorithm::SHA256, secret, body)
       body if digest == signature
     end
   end

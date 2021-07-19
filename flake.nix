@@ -91,6 +91,7 @@
           nomad
           reproxy
           ngrok
+          kcov
 
           inputs.bitte.packages.x86_64-linux.cue
 

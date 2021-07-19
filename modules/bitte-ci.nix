@@ -35,9 +35,8 @@ in {
         default = null;
       };
 
-      nomadDatacenters = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
-      };
+      nomadDatacenters =
+        lib.mkOption { type = lib.types.listOf lib.types.str; };
 
       githubHookSecretFile = lib.mkOption { type = lib.types.str; };
 
@@ -49,11 +48,18 @@ in {
         type = lib.types.str;
         default = "https://raw.githubusercontent.com";
       };
+
+      runnerFlake = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+      };
     };
   };
 
   config = lib.mkIf cfg.enable (let
-    flags = builtins.toString (lib.cli.toGNUCommandLine { } ({
+    toFlags = f: builtins.toString (lib.cli.toGNUCommandLine { } f);
+
+    flags = {
       public-url = cfg.publicUrl;
       postgres-url = cfg.postgresUrl;
       frontend-path = builtins.toString cfg.frontendPath;
@@ -65,11 +71,27 @@ in {
       github-user = cfg.githubUser;
       nomad-token-file = cfg.nomadTokenFile;
       nomad-datacenters = lib.concatStringsSep "," cfg.nomadDatacenters;
-    } // (lib.optionalAttrs (cfg.nomadSslCa != null) {
+      runner-flake = cfg.runnerFlake;
+    };
+
+    certs = lib.optionalAttrs (cfg.nomadSslCa != null) {
       nomad-ssl-ca = cfg.nomadSslCa;
       nomad-ssl-key = cfg.nomadSslKey;
       nomad-ssl-cert = cfg.nomadSslCert;
-    })));
+    };
+
+    listenFlags = toFlags ({
+      inherit (flags) postgres-url nomad-base-url nomad-token-file public-url;
+    } // certs);
+
+    serverFlags = toFlags ({
+      inherit (flags)
+        postgres-url public-url github-user github-token-file frontend-path
+        loki-base-url github-hook-secret-file github-user-content-base-url
+        nomad-base-url nomad-token-file runner-flake nomad-datacenters;
+    } // certs);
+
+    migrateFlags = toFlags { inherit (flags) postgres-url; };
   in {
     systemd.services.bitte-ci-server = {
       description = "Basic server and frontend for the Bitte CI";
@@ -78,7 +100,7 @@ in {
       wantedBy = [ "multi-user.target" ];
       path = with pkgs; [ bitte-ci ];
       script = ''
-        exec bitte-ci server ${flags}
+        exec bitte-ci server ${serverFlags}
       '';
 
       serviceConfig = {
@@ -98,7 +120,7 @@ in {
       wantedBy = [ "multi-user.target" ];
       path = with pkgs; [ bitte-ci ];
       script = ''
-        exec bitte-ci listen ${flags}
+        exec bitte-ci listen ${listenFlags}
       '';
 
       serviceConfig = {
@@ -117,7 +139,7 @@ in {
       ];
       path = with pkgs; [ bitte-ci ];
       script = ''
-        exec bitte-ci migrate ${flags}
+        exec bitte-ci migrate ${migrateFlags}
       '';
 
       serviceConfig = {

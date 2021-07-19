@@ -2,19 +2,17 @@ package ci
 
 ci: steps: [
 	{
-		label: "crystal spec"
-		flakes: "github:NixOS/nixpkgs/nixos-21.05": [
-			"crystal", "shards", "gmp", "pkg-config", "openssl",
-		]
-		cpu:    5000
-		memory: 1024
+		label: "Hello World!"
+		flakes: "github:NixOS/nixpkgs/nixos-21.05": ["bash", "hello"]
+		cpu:    100
+		memory: 32
 		enable: pull_request.base.ref == "master"
 
 		_cmd: """
-			shards
-			crystal spec
+			hello -t > /local/greeting
 			"""
 		command: ["/bin/bash", "-c", _cmd]
+		artifacts: ["/local/greeting"]
 	},
 ]
 

@@ -3,15 +3,66 @@ require "yaml"
 require "http/client"
 require "./uuid"
 require "./job_config"
+require "./simple_config"
 
 Second = 1_000_000_000u64
 Minute = Second * 60
 
 module BitteCI
   class Runner
-    @ci_cue : String
-    @job_config : JobConfig
-    @raw : String
+    struct Config
+      include SimpleConfig::Configuration
+
+      @[Option(help: "Base URL e.g. https://raw.githubusercontent.com")]
+      property github_user_content_base_url : URI
+
+      @[Option(help: "Base URL e.g. http://127.0.0.1:4646")]
+      property nomad_base_url = URI.parse("http://127.0.0.1:4646")
+
+      @[Option(help: "Nomad datacenters to run the jobs in (comma separated)")]
+      property nomad_datacenters : Array(String)
+
+      @[Option(help: "CA cert used for talking with Nomad when using HTTPS")]
+      property nomad_ssl_ca : String?
+
+      @[Option(help: "Key used for talking with Nomad when using HTTPS")]
+      property nomad_ssl_key : String?
+
+      @[Option(help: "Cert used for talking with Nomad when using HTTPS")]
+      property nomad_ssl_cert : String?
+
+      @[Option(help: "Build runner dependencies from this flake")]
+      property runner_flake = URI.parse("github:NixOS/nixpkgs/nixos-21.05")
+
+      @[Option(help: "Base URL e.g. http://127.0.0.1:3100")]
+      property loki_base_url = URI.parse("http://127.0.0.1:4646")
+
+      @[Option(secret: true, help: "Nomad token used for job submission")]
+      property nomad_token : String
+
+      @[Option(help: "PostgreSQL URL e.g. postgres://postgres@127.0.0.1:54321/bitte_ci")]
+      property postgres_url : URI
+
+      property nomad_job_config : NomadJob::Config?
+
+      def for_nomad_job
+        @nomad_job_config ||= NomadJob::Config.new(
+          nomad_datacenters: nomad_datacenters.dup,
+          nomad_base_url: nomad_base_url.dup,
+          nomad_ssl_ca: nomad_ssl_ca,
+          nomad_ssl_cert: nomad_ssl_cert,
+          nomad_ssl_key: nomad_ssl_key,
+          runner_flake: runner_flake,
+          loki_base_url: loki_base_url,
+          nomad_token: nomad_token,
+          postgres_url: postgres_url,
+        )
+      end
+    end
+
+    property ci_cue : String
+    property job_config : JobConfig
+    property raw : String
 
     def self.run(input : IO | String, config : Config)
       raw = case input
@@ -34,7 +85,7 @@ module BitteCI
     def run
       @job_config.ci.steps.each do |step|
         Log.info &.emit("Queue Job", step: step.to_json)
-        NomadJob.new(pr: @pr, raw: @raw, job_config: @job_config, config: @config, step: step).queue!
+        NomadJob.new(pr: @pr, raw: @raw, job_config: @job_config, config: @config.for_nomad_job, step: step).queue!
       end
     end
 
@@ -142,7 +193,25 @@ module BitteCI
   end
 
   class NomadJob
-    def initialize(@pr : GithubHook::PullRequest, @raw : String, @job_config : JobConfig, @config : Config, @step : JobConfig::Step)
+    struct Config
+      getter nomad_datacenters, nomad_base_url, nomad_ssl_ca, nomad_ssl_cert,
+        nomad_ssl_key, runner_flake, loki_base_url, nomad_token, postgres_url
+
+      def initialize(
+        @nomad_datacenters : Array(String),
+        @nomad_base_url : URI,
+        @nomad_ssl_ca : String?,
+        @nomad_ssl_key : String?,
+        @nomad_ssl_cert : String?,
+        @runner_flake : URI,
+        @loki_base_url : URI,
+        @nomad_token : String,
+        @postgres_url : URI
+      )
+      end
+    end
+
+    def initialize(@pr : GithubHook::PullRequest, @raw : String, @job_config : JobConfig, @config : NomadJob::Config, @step : JobConfig::Step)
       @loki_id = UUID.random
     end
 
@@ -250,18 +319,35 @@ module BitteCI
     end
 
     # combine the required dependencies for the runner.sh with
-    def flake_deps
+    def runner_deps
       deps = %w[bashInteractive coreutils cacert gnugrep git].map { |a| "#{@config.runner_flake}##{a}" }
       original = @step.flakes.flat_map { |k, vs| vs.map { |v| "#{k}##{v}" } }
       (deps + original).uniq
     end
+
+    RUNNER_TEMPLATE = <<-RUNNER
+    set -exuo pipefail
+
+    dir="/local/$FULL_NAME"
+
+    if [ ! -d "$dir" ]; then
+      mkdir -p "$(dirname "$dir")"
+
+      git clone "$CLONE_URL" "$dir"
+      git -C "$dir" checkout "$SHA"
+    fi
+
+    cd "$dir"
+
+    exec "$@"
+    RUNNER
 
     def runner
       {
         Name:   "runner",
         Driver: "exec",
         Config: {
-          flake_deps: flake_deps,
+          flake_deps: runner_deps,
           command:    "/bin/bash",
           args:       ["/local/runner.sh"] + [@step.command].flatten,
         },
@@ -290,7 +376,7 @@ module BitteCI
         Templates:     [
           {
             DestPath:     "local/runner.sh",
-            EmbeddedTmpl: runner_template,
+            EmbeddedTmpl: RUNNER_TEMPLATE,
           },
           {
             DestPath:     "local/pr.json",
@@ -304,6 +390,39 @@ module BitteCI
             Policies:   ["nomad-cluster"],
           }
         end,
+      }
+    end
+
+    ARTIFICER_TEMPLATE = <<-ARTIFICER
+    set -exuo pipefail
+
+    echo "$@"
+    ARTIFICER
+
+    def artificer
+      {
+        Name:   "artificer",
+        Driver: "exec",
+        Config: {
+          flake_deps: artificer_deps,
+          command:    "/bin/bash",
+          args:       ["/local/artificer.sh"] + @step.artifacts,
+        },
+        Resources: {
+          CPU:      100,
+          MemoryMB: 128,
+        },
+        Lifecycle: {
+          Hook:    "poststop",
+          Sidecar: true,
+        },
+        Leader:    false,
+        Templates: [
+          {
+            DestPath:     "local/artificer.sh",
+            EmbeddedTmpl: artificer_template,
+          },
+        ],
       }
     end
 
@@ -334,25 +453,6 @@ module BitteCI
           },
         ],
       }
-    end
-
-    def runner_template
-      <<-RUNNER
-      set -exuo pipefail
-
-      dir="/local/$FULL_NAME"
-
-      if [ ! -d "$dir" ]; then
-        mkdir -p "$(dirname "$dir")"
-
-        git clone "$CLONE_URL" "$dir"
-        git -C "$dir" checkout "$SHA"
-      fi
-
-      cd "$dir"
-
-      exec "$@"
-      RUNNER
     end
 
     def promtail_config

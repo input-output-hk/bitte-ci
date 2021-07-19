@@ -175,13 +175,7 @@ in pkgs.nixosTest {
         grafana-loki
       ];
 
-      environment.systemPackages = with pkgs; [
-        curl
-        gawk
-        tree
-        websocat
-        jq
-      ];
+      environment.systemPackages = with pkgs; [ curl gawk tree websocat jq ];
 
       nix = {
         package = pkgs.nixFlakes;

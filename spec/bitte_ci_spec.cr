@@ -4,25 +4,24 @@ describe BitteCI do
   it "is configurable" do
     public_url = "http://example.com"
     loki_url = "http://loki"
+    nomad_token_file = File.join(__DIR__, "fixtures/nomad_token.fixture")
+    ENV["LOKI_BASE_URL"] = loki_url
 
-    c = BitteCI::Config.configure do |config|
-      ENV["BITTE_CI_LOKI_BASE_URL"] = loki_url
-      config["nomad_token_file"] = File.join(__DIR__, "fixtures/nomad_token.fixture")
-
-      config["public_url"] = public_url
-      config["postgres_url"] = "postgres://localhost:5432/bitte_ci"
-      config["nomad_base_url"] = "http://127.0.0.1:4646"
-      config["frontend_path"] = "result"
+    c = BitteCI::Server::Config.configure do |config|
+      config["nomad_token_file"] = nomad_token_file
+      config["frontend_path"] = "frontend"
+      config["github_hook_secret"] = "foobar"
+      config["github_token"] = "token"
       config["github_user_content_base_url"] = "http://127.0.0.1:8080"
-      config["github_hook_secret_file"] = File.join(__DIR__, "fixtures/github_hook_secret.fixture")
-      config["github_user"] = "hello"
-      config["github_token"] = "there"
-      config["nomad_datacenters"] = "dc0"
+      config["github_user"] = "user"
+      config["nomad_datacenters"] = "dc1"
+      config["postgres_url"] = "postgres://localhost:5432/bitte_ci"
+      config["public_url"] = "http://example.com"
     end
 
     c.public_url.should eq(URI.parse(public_url))
     c.loki_base_url.should eq(URI.parse(loki_url))
-    c.nomad_token.should eq(File.read(c.nomad_token_file.not_nil!))
+    c.nomad_token.should eq(File.read(nomad_token_file))
   end
 
   it "works" do
@@ -31,23 +30,21 @@ describe BitteCI do
     control = BitteCI::ChannelControl.new
     channels = [] of Channel(String)
 
-    BitteCI.start_control(control, channels)
-
-    final_config = BitteCI::Config.configure do |config|
-      config["public_url"] = "http://127.0.0.1:9494"
-      config["postgres_url"] = "postgres://localhost:5432/bitte_ci"
-      config["loki_url"] = "http://127.0.0.1:3100"
-      config["nomad_base_url"] = "http://127.0.0.1:4646"
-      config["frontend_path"] = "result"
-      config["github_user_content_base_url"] = "http://127.0.0.1:8080"
+    config = BitteCI::Server::Config.configure do |config|
+      config["nomad_token_file"] = nomad_token_file
+      config["frontend_path"] = "frontend"
       config["github_hook_secret"] = "foobar"
-      config["github_user"] = "hello"
-      config["github_token"] = "there"
-      config["nomad_token"] = "letmein"
-      config["nomad_datacenters"] = "dc0"
+      config["github_token"] = "token"
+      config["github_user_content_base_url"] = "http://127.0.0.1:8080"
+      config["github_user"] = "user"
+      config["nomad_datacenters"] = "dc1"
+      config["postgres_url"] = "postgres://localhost:5432/bitte_ci"
+      config["public_url"] = "http://example.com"
     end
 
-    conn = BitteCI::Connection.new(socket, control, final_config).run
+    BitteCI::Server.new(config).start_control(control, channels)
+
+    conn = BitteCI::Connection.new(socket, control, config).run
     Fiber.yield
     channels.size.should eq(1)
   end

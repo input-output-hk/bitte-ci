@@ -5,7 +5,32 @@ require "pg"
 require "./uuid"
 
 module BitteCI
-  module NomadEvents
+  module Listener
+    struct Config
+      include SimpleConfig::Configuration
+
+      @[Option(help: "PostgreSQL URL e.g. postgres://postgres@127.0.0.1:54321/bitte_ci")]
+      property postgres_url : URI
+
+      @[Option(help: "Base URL e.g. http://127.0.0.1:4646")]
+      property nomad_base_url = URI.parse("http://127.0.0.1:4646")
+
+      @[Option(secret: true, help: "Nomad token used for job submission")]
+      property nomad_token : String
+
+      @[Option(help: "CA cert used for talking with Nomad when using HTTPS")]
+      property nomad_ssl_ca : String?
+
+      @[Option(help: "Key used for talking with Nomad when using HTTPS")]
+      property nomad_ssl_key : String?
+
+      @[Option(help: "Cert used for talking with Nomad when using HTTPS")]
+      property nomad_ssl_cert : String?
+
+      @[Option(help: "Base URL under which this server is reachable e.g. http://example.com")]
+      property public_url : URI
+    end
+
     # TODO: refactor to use Clear
     def self.listen(config : Config)
       DB.open(config.postgres_url.to_s) do |db|
