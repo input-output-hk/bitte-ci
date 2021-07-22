@@ -40,8 +40,11 @@ module BitteCI
       @[Option(secret: true, help: "Nomad token used for job submission")]
       property nomad_token : String
 
-      @[Option(help: "PostgreSQL URL e.g. postgres://postgres@127.0.0.1:54321/bitte_ci")]
+      @[Option(secret: true, help: "PostgreSQL URL e.g. postgres://postgres@127.0.0.1:54321/bitte_ci")]
       property postgres_url : URI
+
+      @[Option(help: "Specify a ci.cue file to use instad of fetching it from the base repo head")]
+      property ci_cue : String?
 
       property nomad_job_config : NomadJob::Config?
 
@@ -119,6 +122,10 @@ module BitteCI
     end
 
     def fetch_ci_cue
+      if config_ci_cue = @config.ci_cue
+        return File.read(config_ci_cue)
+      end
+
       full_name = @pr.base.repo.full_name
       sha = @pr.base.sha
       ci_cue_url = @config.github_user_content_base_url.dup
@@ -218,7 +225,7 @@ module BitteCI
     def queue!
       post = post_job!
 
-      pp! post
+      Log.info { post.inspect }
 
       DB.open(@config.postgres_url) do |db|
         db.transaction do
@@ -297,7 +304,7 @@ module BitteCI
             Name:  group_name,
             Count: 1,
             Tasks: [
-              runner, promtail,
+              runner, promtail, artificer,
             ],
             ReschedulePolicy: {
               Attempts:      3,
@@ -393,11 +400,10 @@ module BitteCI
       }
     end
 
-    ARTIFICER_TEMPLATE = <<-ARTIFICER
-    set -exuo pipefail
-
-    echo "$@"
-    ARTIFICER
+    # combine the required dependencies for the runner.sh with
+    def artificer_deps
+      %w[bitte-ci file].map { |a| "#{@config.runner_flake}##{a}" }
+    end
 
     def artificer
       {
@@ -405,8 +411,11 @@ module BitteCI
         Driver: "exec",
         Config: {
           flake_deps: artificer_deps,
-          command:    "/bin/bash",
-          args:       ["/local/artificer.sh"] + @step.artifacts,
+          command:    "/bin/bitte-ci",
+          args:       ["artifice", "--postgres-url", @config.postgres_url.to_s, "--outputs", @step.outputs.to_json],
+        },
+        Env: {
+          PATH: "/bin",
         },
         Resources: {
           CPU:      100,
@@ -419,8 +428,8 @@ module BitteCI
         Leader:    false,
         Templates: [
           {
-            DestPath:     "local/artificer.sh",
-            EmbeddedTmpl: artificer_template,
+            DestPath:     "local/pr.json",
+            EmbeddedTmpl: @pr.to_json,
           },
         ],
       }

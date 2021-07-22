@@ -4,14 +4,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05";
     bitte.url = "github:input-output-hk/bitte/nix-driver-with-profiles";
-    rust = {
-      url = "github:input-output-hk/rust.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    trigger-source = {
-      url = "github:RedL0tus/trigger";
-      flake = false;
-    };
     arion.url = "github:hercules-ci/arion";
     bitte-ci-frontend.url = "github:input-output-hk/bitte-ci-frontend";
   };
@@ -20,17 +12,6 @@
     let
       overlay = final: prev: {
         nomad = inputs.bitte.legacyPackages.${prev.system}.nomad;
-
-        bitte-ci-env = prev.symlinkJoin {
-          name = "bitte-ci-env";
-          paths = with prev; [
-            bashInteractive
-            cacert
-            coreutils
-            gitMinimal
-            hello
-          ];
-        };
 
         bitte-ci = prev.callPackage ./pkgs/bitte-ci {
           src = prev.lib.sourceFilesBySuffices ./. [
@@ -61,7 +42,7 @@
 
       pkgs = import inputs.nixpkgs {
         system = "x86_64-linux";
-        overlays = [ inputs.rust.overlay overlay ];
+        overlays = [ overlay ];
       };
     in {
       nixosModules.bitte-ci = import ./modules/bitte-ci.nix;
@@ -78,10 +59,10 @@
         # requires https://github.com/NixOS/nix/pull/4983
         # BITTE_CI_POSTGRES_URL = "postgres://postgres@127.0.0.1/bitte_ci";
 
-        BITTE_CI_FRONTEND_PATH = pkgs.bitte-ci-frontend;
+        FRONTEND_PATH = pkgs.bitte-ci-frontend;
 
         shellHook = ''
-          export BITTE_CI_GITHUB_TOKEN="$(awk '/github.com/ {print $6;exit}' ~/.netrc)"
+          export GITHUB_TOKEN="$(awk '/github.com/ {print $6;exit}' ~/.netrc)"
         '';
 
         buildInputs = with pkgs; [

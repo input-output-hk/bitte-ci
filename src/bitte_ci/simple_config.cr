@@ -35,7 +35,13 @@ module SimpleConfig
           %value = ENV[%env_key]? if %value.nil? && %env_key
           %value = {{ ivar.default_value }} if %value.nil?
 
-          {% unless ivar.type.nilable? %}
+          {% if ivar.type.nilable? %}
+            if %value.nil?
+              @{{ivar.id}} = nil
+            else
+              @{{ivar.id}} = %value.to_simple_option({{ivar.type.union_types.reject { |t| t == Nil }.join(" | ").id}})
+            end
+          {% else %}
             if %value.nil?
               raise(::SimpleConfig::Error.missing_flag(
                 %hash_key,
@@ -43,36 +49,12 @@ module SimpleConfig
                 {{ann[:long]}} || {{ivar.id.tr("_", "-").stringify}},
                 %env_key
               ))
+            else
+              @{{ivar.id}} = %value.to_simple_option({{ivar.type}})
             end
           {% end %}
-
-          @{{ivar.id}} = convert(%value, {{ivar.type}})
         {% end %}
       {% end %}
-    end
-
-    def convert(value : String, kind : Array(String).class)
-      value.split(',')
-    end
-
-    def convert(value : String | Nil, kind : (String | Nil).class)
-      value if value
-    end
-
-    def convert(value : String, kind : URI.class)
-      URI.parse(value)
-    end
-
-    def convert(value : URI, kind : URI.class)
-      value
-    end
-
-    def convert(value : String, kind : String.class)
-      value
-    end
-
-    def convert(value : String | Nil, kind : (Path | Nil).class)
-      Path.new(value) if value
     end
 
     macro included
@@ -133,5 +115,41 @@ module SimpleConfig
       notice << "environment variable: '#{env}'" if env
       Error::MissingOption.new(notice.join("\n"))
     end
+  end
+end
+
+class URI
+  def to_simple_option(k : URI.class)
+    self
+  end
+end
+
+class String
+  def to_simple_option(k : Int64.class)
+    to_i64
+  end
+
+  def to_simple_option(k : Array(String).class)
+    if self[0]? == '['
+      Array(String).from_json(self)
+    else
+      split(',')
+    end
+  end
+
+  def to_simple_option(k : String.class)
+    self
+  end
+
+  def to_simple_option(k : URI.class)
+    URI.parse(self)
+  end
+
+  def to_simple_option(k : UInt64.class)
+    to_u64
+  end
+
+  def to_simple_option(k : UUID.class)
+    UUID.new(self)
   end
 end

@@ -11,6 +11,7 @@ module BitteCI
     Migrate
     Queue
     Listen
+    Artifice
   end
 
   def self.parse_options
@@ -20,6 +21,7 @@ module BitteCI
     queue_flags = {} of String => String
     migrate_flags = {} of String => String
     listen_flags = {} of String => String
+    artifice_flags = {} of String => String
 
     config_file = "bitte_ci.json" if File.file?("bitte_ci.json")
 
@@ -46,6 +48,11 @@ module BitteCI
         BitteCI::Listener::Config.option_parser(parser, listen_flags)
       end
 
+      parser.on "artifice", "Store artifacts from an allocation" do
+        action = BitteCI::Cmd::Artifice
+        BitteCI::Artificer::Config.option_parser(parser, artifice_flags)
+      end
+
       parser.on "-h", "--help", "Show this help" do
         puts parser
         exit
@@ -66,22 +73,20 @@ module BitteCI
       BitteCI::Server.start(server_config)
       Kemal.run port: 9494
     in BitteCI::Cmd::Migrate
-      Log.info { "Starting migration" }
-      migrate_config = BitteCI::Migrator::Config.new(migrate_flags, config_file)
-      Clear::SQL.init(migrate_config.postgres_url.to_s)
-      Clear::Migration::Manager.instance.apply_all
-      Log.info { "Migration successful" }
+      BitteCI::Migrator.run(BitteCI::Migrator::Config.new(migrate_flags, config_file))
     in BitteCI::Cmd::Queue
       Log.info { "Adding PR to job queue" }
-      queue_config = BitteCI::Runner::Config.new(queue_flags, config_file)
       arg = ARGV[0]? ? File.read(ARGV[0]) : STDIN
-      BitteCI::Runner.run(arg, queue_config)
+      BitteCI::Runner.run(arg, BitteCI::Runner::Config.new(queue_flags, config_file))
     in BitteCI::Cmd::Listen
       Log.info { "Starting Nomad event listener" }
-      listen_config = BitteCI::Listener::Config.new(listen_flags, config_file)
-      BitteCI::Listener.listen(listen_config)
+      BitteCI::Listener.listen(BitteCI::Listener::Config.new(listen_flags, config_file))
+    in BitteCI::Cmd::Artifice
+      Log.info { "Starting artificer" }
+      BitteCI::Artificer.run(BitteCI::Artificer::Config.new(artifice_flags, config_file))
     in BitteCI::Cmd::None
-      raise "Please specify an action: server | migrate | queue | listen"
+      puts op
+      exit 1
     end
   end
 end

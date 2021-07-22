@@ -5,7 +5,7 @@ let
       id = 1;
       number = 1;
 
-      statuses_url = "http://127.0.0.1:9090/";
+      statuses_url = "http://127.0.0.1:9090/github";
 
       base = {
         repo = {
@@ -31,7 +31,7 @@ let
 
   bitteConfig = pkgs.writeText "bitte.json" (builtins.toJSON {
     public_url = "http://example.com";
-    postgres_url = "postgres://bitte_ci@localhost:5432/bitte_ci";
+    postgres_url = "postgres://bitte_ci@127.0.0.1:5432/bitte_ci";
     frontend_path = builtins.toString pkgs.bitte-ci-frontend;
     github_user_content_base_url = "http://localhost:8080";
     github_hook_secret_file =
@@ -42,7 +42,7 @@ let
     github_user = "tester";
     nomad_token_file = builtins.toFile "nomad" "secret";
     nomad_datacenters = "dc1";
-    runner_flake = "nixpkgs";
+    runner_flake = "path:/bitte-ci";
   });
 
   testJob = pkgs.writeShellScript "test.sh" ''
@@ -57,9 +57,10 @@ let
     status="$(nomad job status bitte-ci)"
     echo "vvv STATUS vvv"
     echo "$status"
-    id="$(echo "$status" | nomad job status bitte-ci | tail -1 | awk '{print $1}')"
+    id="$(nomad job status bitte-ci | tail -1 | awk '{print $1}')"
     echo "vvv JOB vvv"
-    nomad status "$id"
+    job="$(nomad status "$id")"
+    echo "$job"
 
     set -x
 
@@ -77,23 +78,33 @@ let
         | jq -r '.value[0].builds[0].id'
     )"
 
-    json="$(
-      echo '{"channel":"build"}' \
-        | jq -c --arg uuid "$uuid" '.uuid = $uuid' \
-    )"
-
-    echo "$json" \
+    echo '{"channel":"build"}' \
+      | jq -c --arg uuid "$uuid" '.uuid = $uuid' \
       | websocat -B 1000000 ws://0.0.0.0:9494/ci/api/v1/socket \
-      | jq -e '.value.logs[][-1].line == "Hello, world!"'
+      | jq -e '.value.logs[][-1].line == "hello, world"'
+
+    echo '{"channel":"allocation"}' \
+      | jq -c --arg uuid "$(echo "$job" | awk '/ID/ { print $3; exit }')" '.uuid = $uuid' \
+      | websocat -B 1000000 ws://0.0.0.0:9494/ci/api/v1/socket \
+      | jq
   '';
 
   testFlake = pkgs.writeText "flake.nix" ''
     {
       description = "Test";
       inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05";
-      outputs = { self, nixpkgs }: {
-        legacyPackages.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux;
-      };
+      inputs.bitte-ci.url = "path:/bitte-ci";
+      outputs = { self, nixpkgs, ... }@inputs:
+        let
+          overlay = final: prev: {
+            bitte-ci = inputs.bitte-ci.packages.x86_64-linux.bitte-ci;
+          };
+
+          pkgs = import nixpkgs {
+            system = "x86_64-linux";
+            overlays = [ overlay ];
+          };
+        in { legacyPackages.x86_64-linux = pkgs; };
     }
   '';
 
@@ -125,8 +136,9 @@ let
     ci: steps: [
       {
         label: "hello"
-        command: "hello"
+        command: ["bash", "-c", "hello -t > /alloc/hello; hello -t"]
         flakes: "path:/test-repo": ["hello"]
+        outputs: ["/alloc/hello"]
       }
     ]
   '';
@@ -152,6 +164,10 @@ let
 
     server.start
   '';
+
+  bitteCiFlake = pkgs.writeShellScript "ci.sh" ''
+    cp -r ${inputs.self} /bitte-ci
+  '';
 in pkgs.nixosTest {
   name = "bitte-ci";
 
@@ -173,9 +189,19 @@ in pkgs.nixosTest {
         git
         hello
         grafana-loki
+
+        bitte-ci
+        file
       ];
 
-      environment.systemPackages = with pkgs; [ curl gawk tree websocat jq ];
+      environment.systemPackages = with pkgs; [
+        curl
+        gawk
+        tree
+        websocat
+        jq
+        bat
+      ];
 
       nix = {
         package = pkgs.nixFlakes;
@@ -355,7 +381,15 @@ in pkgs.nixosTest {
     # wait for bitte ci server to respond
     ci.wait_for_open_port(9494)
 
+    ci.log(ci.succeed("${bitteCiFlake}"))
+    ci.log(ci.succeed("nix build path:/test-repo#bitte-ci"))
+
     ci.log(ci.succeed("${testJob}"))
+
+    ci.wait_for_console_text("artifice --postgres-url")
+    ci.sleep(10)
+    ci.log(ci.succeed("nomad job status bitte-ci"))
+    ci.log(ci.succeed("bat /var/lib/nomad/alloc/*/*/logs/*"))
 
     ci.log(ci.wait_until_succeeds("${checkJob}"))
   '';

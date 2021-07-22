@@ -24,6 +24,7 @@ module BitteCI
       property cpu : UInt32 = 100
       property memory : UInt32 = 300
       property priority : UInt32 = 50
+      property outputs : Array(String) = [] of String
     end
   end
 end

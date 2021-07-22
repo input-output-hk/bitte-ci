@@ -31,6 +31,7 @@ module BitteCI
   enum MsgChannel
     PullRequests
     PullRequest
+    Allocation
     Build
   end
 
@@ -66,21 +67,37 @@ module BitteCI
       end
 
       @socket.on_message do |body|
-        pp! body
         msg = Msg.from_json(body)
+        id = msg.id
+        uuid = msg.uuid
 
         case msg.channel
         in MsgChannel::PullRequests
           @socket.send(on_pull_requests.to_json)
         in MsgChannel::PullRequest
-          @socket.send(on_pull_request(msg.id).to_json)
+          respond(id) { |i| on_pull_request(i) }
         in MsgChannel::Build
-          @socket.send(on_build(msg.uuid).to_json)
+          respond(msg.uuid) { |i| on_build(i) }
+        in MsgChannel::Allocation
+          respond(msg.uuid) { |i| on_alloc(i) }
         end
       end
     end
 
-    def on_build(id : Nil)
+    def respond(arg)
+      obj =
+        if arg
+          yield(arg)
+        else
+          {error: "argument missing"}
+        end
+      @socket.send(obj.to_json)
+    end
+
+    def on_alloc(id : UUID)
+      alloc = Allocation.query.where { var("id") == id }.first
+      outputs = Output.query.where { alloc_id == id }.select(:id, :size, :created_at, :alloc_id, :path, :mime).to_a
+      {type: "allocation", allocation: alloc, outputs: outputs} if alloc
     end
 
     def on_build(id : UUID)
@@ -97,15 +114,9 @@ module BitteCI
       {type: "pull_requests", value: prs}
     end
 
-    def on_pull_request(id : Nil)
-    end
-
     def on_pull_request(id : Int64)
       pr = PullRequest.query.where { var("id") == id }.first
       {type: "pull_request", value: pr.simplify} if pr
-    end
-
-    def on_build(id : Nil)
     end
 
     def on_build(id : UUID)
@@ -153,7 +164,7 @@ module BitteCI
 
       {type: "build", value: {build: build.simplify, logs: logs}}
     rescue e : JSON::ParseException
-      Log.error &.emit(e.inspect, body: res.body) if res
+      Log.error &.emit(e.inspect, url: url.to_s, body: res.body) if res
       sleep 1
     end
   end
@@ -263,11 +274,22 @@ module BitteCI
         index_html
       end
 
+      get "/api/v1/output/:id" do |env|
+        output = Output.query.where { var("id") == env.params.url["id"] }.first
+        if output
+          env.response.headers["Content-Type"] = "application/octet-stream"
+          env.response.headers["Content-Disposition"] = %(attachment; filename="#{File.basename(output.path)}")
+          output.data
+        else
+          halt env, status_code: 404, response: "Not Found"
+        end
+      end
+
       post "/api/v1/github" do |env|
         BitteCI::Trigger.handle(config, env)
       end
 
-      %w[pull_requests pull_request build].each do |sub|
+      %w[pull_requests pull_request build allocation].each do |sub|
         get "/#{sub}/*" do
           index_html
         end

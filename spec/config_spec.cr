@@ -1,3 +1,4 @@
+require "spec"
 require "../src/bitte_ci/simple_config"
 
 struct Config
@@ -22,8 +23,11 @@ end
 struct Types
   include SimpleConfig::Configuration
 
-  @[Option(help: "s")]
+  @[Option(help: "uri")]
   property url : URI
+
+  @[Option(help: "arr")]
+  property arr : Array(String)
 end
 
 Spec.before_each do
@@ -87,10 +91,22 @@ describe SimpleConfig::Configuration do
     Config.new(main_config, nil).d.should eq("from flag d")
   end
 
-  it "handles different types" do
-    Types.new({
+  it "handles different urls and json arrays" do
+    c = Types.new({
       "url" => "http://example.com",
-    }, nil).url.should eq(URI.parse("http://example.com"))
+      "arr" => %(["a", "b"]),
+    }, nil)
+    c.url.should eq(URI.parse("http://example.com"))
+    c.arr.should eq(["a", "b"])
+  end
+
+  it "handles different comma separated arrays" do
+    c = Types.new({
+      "url" => "http://example.com",
+      "arr" => "a,b",
+    }, nil)
+    c.url.should eq(URI.parse("http://example.com"))
+    c.arr.should eq(["a", "b"])
   end
 
   it "complains about a missing option" do

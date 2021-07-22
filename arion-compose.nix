@@ -55,14 +55,6 @@
       config = builtins.toFile "reproxy.yml" (builtins.toJSON {
         default = [
           {
-            route = "^/loki/api/v1/query_range";
-            dest = "http://127.0.0.1:3100/loki/api/v1/query_range";
-          }
-          {
-            route = "^/loki/api/v1/label/(.+)/values";
-            dest = "http://127.0.0.1:3100/loki/api/v1/label/$1/values";
-          }
-          {
             route = "^/ci/api/v1/(.*)";
             dest = "http://127.0.0.1:9494/ci/api/v1/$1";
           }
@@ -87,18 +79,6 @@
       service.network_mode = "host";
     };
 
-    # trigger = {
-    #   service.useHostStore = true;
-    #   service.command = [
-    #     "${pkgs.trigger}/bin/trigger"
-    #     "--config"
-    #     (pkgs.writeText "trigger.yml" pkgs.triggerConfig)
-    #   ];
-
-    #   service.environment = { TRIGGER_LOG = "debug"; };
-    #   service.ports = [ "3132:3132" ];
-    # };
-
     postgres = let
       hba = pkgs.writeText "pg_hba.conf" ''
         local all all trust
@@ -118,7 +98,7 @@
       service.useHostStore = true;
       service.command = [
         (pkgs.writeShellScript "entrypoint" ''
-          set -exuo pipefail
+          set -euo pipefail
 
           echo postgres:x:71:71:postgres user:/:/bin/sh >> /etc/passwd
           echo postgres:x:71:postgres >> /etc/group

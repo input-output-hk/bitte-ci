@@ -9,8 +9,6 @@ class PullRequest
   primary_key type: :bigint
   column data : JSON::Any
 
-  # belongs_to project : Project, foreign_key: "project_id", foreign_key_type: UUID
-
   has_many builds : Build, foreign_key: "pr_id"
 
   # TODO: whittle down the data we actually want to send
@@ -99,45 +97,48 @@ class Allocation
   column client_status : String
   column index : Int64
   column eval_id : UUID
+
+  has_many outputs : Output, foreign_key: "alloc_id"
 end
 
-class Migration1
-  include Clear::Migration
+class Output
+  include Clear::Model
 
-  def change(direction)
-    create_enum :build_status_type, BuildStatus
+  primary_key type: :uuid
+  column data : Bytes
+  column size : UInt64
+  column created_at : Time
+  column alloc_id : UUID
+  column path : String
+  column mime : String
 
-    create_table :allocations, id: :uuid do |t|
-      t.column :client_status, :string, null: false
-      t.column :created_at, :timestamptz, null: false
-      t.column :updated_at, :timestamptz, null: false
-      t.column :index, :bigint, null: false
-      t.column :eval_id, :uuid, null: false
-    end
+  belongs_to allocation : Build, foreign_key: "alloc_id", foreign_key_type: UUID
 
-    # create_table :projects, id: :uuid do |t|
-    #   t.column :name, :string, null: false, unique: true
-    #   t.column :created_at, :timestamptz, null: false
-    #   t.column :updated_at, :timestamptz
-    #   t.index ["created_at"]
-    #   t.index ["updated_at"]
-    # end
-
-    create_table :pull_requests, id: :bigserial do |t|
-      t.column :data, :jsonb, null: false
-      # t.references to: "projects", name: "project_id", type: "uuid", null: false, on_delete: :cascade
-    end
-
-    create_table :builds, id: :uuid do |t|
-      t.column :build_status, :build_status_type
-      t.column :created_at, :timestamptz, null: false
-      t.column :updated_at, :timestamptz
-      t.column :finished_at, :timestamptz
-      t.column :loki_id, :uuid, null: false
-      t.references to: "pull_requests", name: "pr_id", type: "bigserial", null: false, on_delete: :cascade
-      t.index ["created_at"]
-      t.index ["updated_at"]
-      t.index ["finished_at"]
-    end
+  def inspect
+    {id: id, created_at: created_at, alloc_id: alloc_id, size: size.humanize, path: path, mime: mime}.inspect
   end
 end
+
+# Convert from bytea column to Crystal's Bytes
+class Clear::Model::Converter::BytesConverter
+  def self.to_column(x : String | Bytes | Nil) : Bytes?
+    case x
+    in String
+      x.to_slice
+    in Bytes
+      x
+    in Nil
+      nil
+    end
+  end
+
+  def self.to_column(x)
+    raise Clear::ErrorMessages.converter_error(x.class.name, "Bytes")
+  end
+
+  def self.to_db(x : Bytes?)
+    x
+  end
+end
+
+Clear::Model::Converter.add_converter("Bytes", Clear::Model::Converter::BytesConverter)
