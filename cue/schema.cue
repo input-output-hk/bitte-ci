@@ -11,6 +11,7 @@ import ("list")
 	cpu:     *100 | uint
 	memory:  *300 | uint
 	outputs: [...string] | *[]
+	env: [string]: string
 }
 
 ci: {

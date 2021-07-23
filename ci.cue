@@ -12,7 +12,10 @@ ci: steps: [
 			hello -t > /local/greeting
 			"""
 		command: ["/bin/bash", "-c", _cmd]
-		artifacts: ["/local/greeting"]
+		outputs: ["/local/greeting"]
+		env: {
+			PATH: "/bin"
+		}
 	},
 ]
 

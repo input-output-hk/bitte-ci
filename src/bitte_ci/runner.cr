@@ -358,7 +358,7 @@ module BitteCI
           command:    "/bin/bash",
           args:       ["/local/runner.sh"] + [@step.command].flatten,
         },
-        Env: {
+        Env: @step.env.merge({
           "PATH"          => "/bin",
           "SSL_CERT_FILE" => "/etc/ssl/certs/ca-bundle.crt",
           "SHA"           => @pr.head.sha,
@@ -366,7 +366,7 @@ module BitteCI
           "LABEL"         => @pr.head.label,
           "REF"           => @pr.head.ref,
           "FULL_NAME"     => @pr.base.repo.full_name,
-        },
+        }),
         KillSignal: "SIGINT",
         Resources:  {
           CPU:      @step.cpu,

@@ -25,6 +25,7 @@ module BitteCI
       property memory : UInt32 = 300
       property priority : UInt32 = 50
       property outputs : Array(String) = [] of String
+      property env : Hash(String, String) = {} of String => String
     end
   end
 end
