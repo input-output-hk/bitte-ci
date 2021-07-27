@@ -25,6 +25,11 @@ Nomad requires elevated permissions, so start it separately with:
 
     sudo nomad agent -dev -config agent.hcl
 
+Then run the bitte-ci listener and server:
+
+    bitte-ci server --config ./config.json
+    bitte-ci listen --config ./config.json
+
 ## WebSocket API
 
 You can communicate with the Websocket based API at the path: `/ci/api/v1/socket`.
