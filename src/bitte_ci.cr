@@ -26,29 +26,34 @@ module BitteCI
     config_file = "bitte_ci.json" if File.file?("bitte_ci.json")
 
     op = OptionParser.new do |parser|
-      parser.banner = "Usage: bitte-ci server"
+      parser.banner = "Usage: bitte-ci"
 
       parser.on "server", "Start the webserver" do
+        parser.banner = "Usage: bitte-ci"
         action = BitteCI::Cmd::Serve
         BitteCI::Server::Config.option_parser(parser, server_flags)
       end
 
       parser.on "migrate", "Migrate the DB" do
+        parser.banner = "Usage: bitte-ci migrate"
         action = BitteCI::Cmd::Migrate
         BitteCI::Migrator::Config.option_parser(parser, migrate_flags)
       end
 
       parser.on "queue", "queue the PR piped into stdin or passed as argument" do
+        parser.banner = "Usage: bitte-ci queue"
         action = BitteCI::Cmd::Queue
         BitteCI::Runner::Config.option_parser(parser, queue_flags)
       end
 
       parser.on "listen", "Start nomad event listener" do
+        parser.banner = "Usage: bitte-ci listen"
         action = BitteCI::Cmd::Listen
         BitteCI::Listener::Config.option_parser(parser, listen_flags)
       end
 
       parser.on "artifice", "Store artifacts from an allocation" do
+        parser.banner = "Usage: bitte-ci artifice"
         action = BitteCI::Cmd::Artifice
         BitteCI::Artificer::Config.option_parser(parser, artifice_flags)
       end
