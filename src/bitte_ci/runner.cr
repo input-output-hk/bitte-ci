@@ -14,7 +14,7 @@ module BitteCI
       include SimpleConfig::Configuration
 
       @[Option(help: "Base URL e.g. https://raw.githubusercontent.com")]
-      property github_user_content_base_url : URI
+      property github_user_content_base_url : URI = URI.parse("https://raw.githubusercontent.com")
 
       @[Option(help: "Base URL e.g. http://127.0.0.1:4646")]
       property nomad_base_url = URI.parse("http://127.0.0.1:4646")
