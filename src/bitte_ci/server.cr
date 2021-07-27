@@ -252,7 +252,7 @@ module BitteCI
             PullRequest.query.where { id == n.payload }.first
           when "allocations"
             alloc = Allocation.query.where { id == n.payload }.first
-            {allocation: alloc.simplify} if alloc
+            alloc.simplify if alloc
           end
 
         channels.each { |c| c.send({"type" => n.channel, "value" => obj}.to_json) } if obj
