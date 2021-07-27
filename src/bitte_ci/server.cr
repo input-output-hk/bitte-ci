@@ -212,9 +212,6 @@ module BitteCI
       @[Option(help: "Nomad datacenters to run the jobs in (comma separated)")]
       property nomad_datacenters : Array(String)
 
-      @[Option(help: "Build runner dependencies from this flake")]
-      property runner_flake = URI.parse("github:NixOS/nixpkgs/nixos-21.05")
-
       @[Option(secret: true, help: "Nomad token used for job submission")]
       property nomad_token : String
 
@@ -255,7 +252,9 @@ module BitteCI
           when "pull_requests"
             PullRequest.query.where { id == n.payload }.first
           when "allocations"
-            Allocation.query.where { id == n.payload }.first
+            alloc = Allocation.query.where { id == n.payload }.first
+            outputs = Output.query.where { alloc_id == n.payload }.select(:id, :size, :created_at, :alloc_id, :path, :mime).to_a
+            {allocation: alloc, outputs: outputs}
           end
 
         channels.each { |c| c.send({"type" => n.channel, "value" => obj}.to_json) } if obj

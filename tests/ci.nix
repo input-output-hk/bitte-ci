@@ -9,20 +9,20 @@ let
 
       base = {
         repo = {
-          full_name = "";
-          clone_url = "";
+          full_name = "iog/ci";
+          clone_url = "git://127.0.0.1:7070/";
         };
-        sha = "";
+        sha = "a949ab892bc2009c9cfa2d674eab418ac6fac406";
         label = "";
         ref = "";
       };
 
       head = {
         repo = {
-          full_name = "";
-          clone_url = "";
+          full_name = "iog/ci";
+          clone_url = "git://127.0.0.1:7070/";
         };
-        sha = "";
+        sha = "a949ab892bc2009c9cfa2d674eab418ac6fac406";
         label = "";
         ref = "";
       };
@@ -54,15 +54,17 @@ let
   checkJob = pkgs.writeShellScript "check.sh" ''
     sleep 2
 
-    status="$(nomad job status bitte-ci)"
+    set -exuo pipefail
+
+    nomad status
+
+    status="$(nomad job status iog/ci#1:a949ab892bc2009c9cfa2d674eab418ac6fac406)"
     echo "vvv STATUS vvv"
     echo "$status"
-    id="$(nomad job status bitte-ci | tail -1 | awk '{print $1}')"
+    id="$(nomad job status iog/ci#1:a949ab892bc2009c9cfa2d674eab418ac6fac406 | tail -1 | awk '{print $1}')"
     echo "vvv JOB vvv"
     job="$(nomad status "$id")"
     echo "$job"
-
-    set -x
 
     echo "vvv LOGS PROMTAIL vvv"
     nomad logs "$id" promtail
@@ -157,7 +159,8 @@ let
     end
 
     server.mount_proc "/github" do |req, res|
-      puts "Received github status request: #{req.inspect}"
+      puts "Received github status request:"
+      pp JSON.parse(req.body)
       res.body = "OK"
       res.status = 201
     end
@@ -226,6 +229,7 @@ in pkgs.nixosTest {
 
       systemd.services.webfsd = {
         before = [ "bitte-ci-server.service" ];
+        requires = [ "git-daemon.service" ];
         wantedBy = [ "multi-user.target" ];
         path = with pkgs; [ webfs git ];
         environment = { HOME = "/root"; };
@@ -233,12 +237,19 @@ in pkgs.nixosTest {
           set -exuo pipefail
 
           mkdir -p /test-repo
-          cd /test-repo
+          exec webfsd -F -j -p 8080 -r /test-repo
+        '';
+      };
 
-          ln -s ${
-            builtins.getFlake
-            "github:NixOS/nixpkgs?rev=aea7242187f21a120fe73b5099c4167e12ec9aab"
-          } nomad-nixpkgs
+      systemd.services.git-daemon = {
+        wantedBy = [ "multi-user.target" ];
+        path = with pkgs; [ git ];
+        environment.HOME = "/root";
+        script = ''
+          set -exuo pipefail
+
+          mkdir -p /test-repo/iog/ci
+          cd /test-repo
 
           git config --global init.defaultBranch master
           git config --global user.email "test@example.com"
@@ -250,7 +261,23 @@ in pkgs.nixosTest {
           git add .
           git commit -m 'inaugural commit'
 
-          exec webfsd -F -j -p 8080 -r /test-repo
+          ln -s ${
+            builtins.getFlake
+            "github:NixOS/nixpkgs?rev=aea7242187f21a120fe73b5099c4167e12ec9aab"
+          } nomad-nixpkgs
+          ln -s /test-repo /test-repo/iog/ci/a949ab892bc2009c9cfa2d674eab418ac6fac406
+          ls -la /test-repo/iog/ci/a949ab892bc2009c9cfa2d674eab418ac6fac406
+
+          git log | head
+
+          exec git daemon \
+            --listen=0.0.0.0 \
+            --port=7070 \
+            --verbose \
+            --export-all \
+            --base-path=.git \
+            --reuseaddr \
+            --strict-paths .git/
         '';
       };
 
@@ -385,12 +412,8 @@ in pkgs.nixosTest {
     ci.log(ci.succeed("nix build path:/test-repo#bitte-ci"))
 
     ci.log(ci.succeed("${testJob}"))
-
-    ci.wait_for_console_text("artifice --postgres-url")
-    ci.sleep(10)
-    ci.log(ci.succeed("nomad job status bitte-ci"))
-    ci.log(ci.succeed("bat /var/lib/nomad/alloc/*/*/logs/*"))
-
+    # ci.log(ci.succeed("bat /var/lib/nomad/alloc/*/*/logs/*"))
     ci.log(ci.wait_until_succeeds("${checkJob}"))
+    ci.log(ci.succeed("${checkJob}"))
   '';
 }

@@ -66,6 +66,7 @@ module BitteCI
       j = Line.from_json(line)
       j.events.each do |event|
         next unless event.is_a?(Allocation)
+        pp! event
 
         db.transaction do
           id = event.payload.allocation.id

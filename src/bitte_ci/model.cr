@@ -66,6 +66,11 @@ class Build
       context:     "Bitte CI",
     }
 
+    Log.info &.emit("sending github status",
+      state: body[:state],
+      target_url: body[:target_url].to_s,
+      description: body[:description])
+
     uri = statuses_url
     client = HTTP::Client.new(uri)
     client.basic_auth user, token
@@ -85,6 +90,8 @@ class Build
         "HTTP Error while trying to POST github status to #{uri} : #{res.status.to_i} #{res.status_message}"
       }
     end
+  rescue e : Socket::ConnectError
+    Log.error &.emit(e.inspect, url: statuses_url.to_s)
   end
 end
 

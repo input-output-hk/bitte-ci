@@ -32,7 +32,7 @@ module BitteCI
       property nomad_ssl_cert : String?
 
       @[Option(help: "Build runner dependencies from this flake")]
-      property runner_flake = URI.parse("github:NixOS/nixpkgs/nixos-21.05")
+      property runner_flake = URI.parse("github:input-output-hk/bitte-ci")
 
       @[Option(help: "Base URL e.g. http://127.0.0.1:3100")]
       property loki_base_url = URI.parse("http://127.0.0.1:4646")
@@ -294,8 +294,8 @@ module BitteCI
     def job
       {
         Namespace:   nil,
-        ID:          "bitte-ci",
-        Name:        "bitte-ci",
+        ID:          group_name,
+        Name:        group_name,
         Type:        "batch",
         Priority:    @step.priority,
         Datacenters: @config.nomad_datacenters,
@@ -335,16 +335,30 @@ module BitteCI
     RUNNER_TEMPLATE = <<-RUNNER
     set -exuo pipefail
 
+    ulimit -a
+
+    cd /local
+    rm -rf bitte-ci cardano-node-tests
+
+    git clone --depth 1 https://github.com/input-output-hk/cardano-node-tests
+
     dir="/local/$FULL_NAME"
 
-    if [ ! -d "$dir" ]; then
-      mkdir -p "$(dirname "$dir")"
-
-      git clone "$CLONE_URL" "$dir"
-      git -C "$dir" checkout "$SHA"
-    fi
-
+    rm -rf "$dir"
+    mkdir -p "$dir"
     cd "$dir"
+
+    # create and initialize an empty repository
+    git init
+
+    # add a remote named origin for the repository at <repository>
+    git remote add origin "$CLONE_URL"
+
+    # fetch a commit using its hash
+    git fetch origin "$SHA"
+
+    # reset repository to that commit
+    git reset --hard FETCH_HEAD
 
     exec "$@"
     RUNNER
@@ -359,13 +373,21 @@ module BitteCI
           args:       ["/local/runner.sh"] + [@step.command].flatten,
         },
         Env: @step.env.merge({
-          "PATH"          => "/bin",
-          "SSL_CERT_FILE" => "/etc/ssl/certs/ca-bundle.crt",
-          "SHA"           => @pr.head.sha,
-          "CLONE_URL"     => @pr.head.repo.clone_url,
-          "LABEL"         => @pr.head.label,
-          "REF"           => @pr.head.ref,
-          "FULL_NAME"     => @pr.base.repo.full_name,
+          "PATH"             => "/bin",
+          "SSL_CERT_FILE"    => "/etc/ssl/certs/ca-bundle.crt",
+          "SHA"              => @pr.head.sha,
+          "CLONE_URL"        => @pr.head.repo.clone_url,
+          "LABEL"            => @pr.head.label,
+          "REF"              => @pr.head.ref,
+          "FULL_NAME"        => @pr.base.repo.full_name,
+          "GIT_TRACE"        => "2",
+          "GIT_CURL_VERBOSE" => "2",
+          # "GIT_TRACE_PERFORMANCE" => "2",
+          # "GIT_TRACE_PACK_ACCESS" => "2",
+          # "GIT_TRACE_PACKET"      => "2",
+          # "GIT_TRACE_PACKFILE"    => "2",
+          # "GIT_TRACE_SETUP"       => "2",
+          # "GIT_TRACE_SHALLOW"     => "2",
         }),
         KillSignal: "SIGINT",
         Resources:  {
