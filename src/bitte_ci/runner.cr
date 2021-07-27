@@ -335,13 +335,6 @@ module BitteCI
     RUNNER_TEMPLATE = <<-RUNNER
     set -exuo pipefail
 
-    ulimit -a
-
-    cd /local
-    rm -rf bitte-ci cardano-node-tests
-
-    git clone --depth 1 https://github.com/input-output-hk/cardano-node-tests
-
     dir="/local/$FULL_NAME"
 
     rm -rf "$dir"
@@ -373,21 +366,13 @@ module BitteCI
           args:       ["/local/runner.sh"] + [@step.command].flatten,
         },
         Env: @step.env.merge({
-          "PATH"             => "/bin",
-          "SSL_CERT_FILE"    => "/etc/ssl/certs/ca-bundle.crt",
-          "SHA"              => @pr.head.sha,
-          "CLONE_URL"        => @pr.head.repo.clone_url,
-          "LABEL"            => @pr.head.label,
-          "REF"              => @pr.head.ref,
-          "FULL_NAME"        => @pr.base.repo.full_name,
-          "GIT_TRACE"        => "2",
-          "GIT_CURL_VERBOSE" => "2",
-          # "GIT_TRACE_PERFORMANCE" => "2",
-          # "GIT_TRACE_PACK_ACCESS" => "2",
-          # "GIT_TRACE_PACKET"      => "2",
-          # "GIT_TRACE_PACKFILE"    => "2",
-          # "GIT_TRACE_SETUP"       => "2",
-          # "GIT_TRACE_SHALLOW"     => "2",
+          "PATH"          => "/bin",
+          "SSL_CERT_FILE" => "/etc/ssl/certs/ca-bundle.crt",
+          "SHA"           => @pr.head.sha,
+          "CLONE_URL"     => @pr.head.repo.clone_url,
+          "LABEL"         => @pr.head.label,
+          "REF"           => @pr.head.ref,
+          "FULL_NAME"     => @pr.base.repo.full_name,
         }),
         KillSignal: "SIGINT",
         Resources:  {

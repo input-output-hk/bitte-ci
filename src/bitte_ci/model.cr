@@ -106,6 +106,18 @@ class Allocation
   column eval_id : UUID
 
   has_many outputs : Output, foreign_key: "alloc_id"
+
+  def simplify
+    outputs = Output.query.where { alloc_id == id }.select(:id, :size, :created_at, :alloc_id, :path, :mime).to_a
+    {
+      created_at:    created_at,
+      updated_at:    updated_at,
+      client_status: client_status,
+      index:         index,
+      eval_id:       eval_id,
+      outputs:       outputs,
+    }
+  end
 end
 
 class Output

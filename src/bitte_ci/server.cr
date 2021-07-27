@@ -96,13 +96,12 @@ module BitteCI
 
     def on_alloc(id : UUID)
       alloc = Allocation.query.where { var("id") == id }.first
-      outputs = Output.query.where { alloc_id == id }.select(:id, :size, :created_at, :alloc_id, :path, :mime).to_a
-      {type: "allocation", allocation: alloc, outputs: outputs} if alloc
+      {type: "allocation", value: alloc.simplify} if alloc
     end
 
     def on_build(id : UUID)
       build = Build.query.where { var("id") == id }.first
-      {type: "build", build: build.simplify} if build
+      {type: "build", value: build.simplify} if build
     end
 
     def on_pull_requests
@@ -253,8 +252,7 @@ module BitteCI
             PullRequest.query.where { id == n.payload }.first
           when "allocations"
             alloc = Allocation.query.where { id == n.payload }.first
-            outputs = Output.query.where { alloc_id == n.payload }.select(:id, :size, :created_at, :alloc_id, :path, :mime).to_a
-            {allocation: alloc, outputs: outputs}
+            {allocation: alloc.simplify} if alloc
           end
 
         channels.each { |c| c.send({"type" => n.channel, "value" => obj}.to_json) } if obj
