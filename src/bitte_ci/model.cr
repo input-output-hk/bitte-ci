@@ -110,12 +110,13 @@ class Allocation
   def simplify
     outputs = Output.query.where { alloc_id == id }.select(:id, :size, :created_at, :alloc_id, :path, :mime).to_a
     {
-      created_at:    created_at,
-      updated_at:    updated_at,
       client_status: client_status,
-      index:         index,
+      created_at:    created_at,
       eval_id:       eval_id,
+      id:            id,
+      index:         index,
       outputs:       outputs,
+      updated_at:    updated_at,
     }
   end
 end
