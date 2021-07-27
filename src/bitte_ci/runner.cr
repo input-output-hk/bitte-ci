@@ -335,6 +335,8 @@ module BitteCI
     RUNNER_TEMPLATE = <<-RUNNER
     set -exuo pipefail
 
+    echo "$SSL_CERT_FILE"
+
     dir="/local/$FULL_NAME"
 
     rm -rf "$dir"
@@ -366,13 +368,15 @@ module BitteCI
           args:       ["/local/runner.sh"] + [@step.command].flatten,
         },
         Env: @step.env.merge({
-          "PATH"          => "/bin",
-          "SSL_CERT_FILE" => "/current-alloc/etc/ssl/certs/ca-bundle.crt",
-          "SHA"           => @pr.head.sha,
-          "CLONE_URL"     => @pr.head.repo.clone_url,
-          "LABEL"         => @pr.head.label,
-          "REF"           => @pr.head.ref,
-          "FULL_NAME"     => @pr.base.repo.full_name,
+          "PATH"             => "/bin",
+          "SSL_CERT_FILE"    => "/current-alloc/etc/ssl/certs/ca-bundle.crt",
+          "SHA"              => @pr.head.sha,
+          "CLONE_URL"        => @pr.head.repo.clone_url,
+          "LABEL"            => @pr.head.label,
+          "REF"              => @pr.head.ref,
+          "FULL_NAME"        => @pr.base.repo.full_name,
+          "GIT_TRACE"        => "2",
+          "GIT_CURL_VERBOSE" => "2",
         }),
         KillSignal: "SIGINT",
         Resources:  {
