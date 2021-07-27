@@ -367,7 +367,7 @@ module BitteCI
         },
         Env: @step.env.merge({
           "PATH"          => "/bin",
-          "SSL_CERT_FILE" => "/etc/ssl/certs/ca-bundle.crt",
+          "SSL_CERT_FILE" => "/current-alloc/etc/ssl/certs/ca-bundle.crt",
           "SHA"           => @pr.head.sha,
           "CLONE_URL"     => @pr.head.repo.clone_url,
           "LABEL"         => @pr.head.label,
