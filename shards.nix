@@ -29,6 +29,12 @@
     rev = "f5dafc934a70e0ee2f246dddf3df44686f844da2";
     sha256 = "042n6qj8frhy7zh5swmvlb69rn1hnzdsf033xy9yz029zx9mi40k";
   };
+  git = {
+    owner = "smacker";
+    repo = "libgit2.cr";
+    rev = "6267162e7d9e16edace62f942d08565518bc73d9";
+    sha256 = "1rs80q8i9dlrhwprqyj5hpcqn3gxqfxn2kcjc9wbxz9xqam3iqh2";
+  };
   habitat = {
     owner = "luckyframework";
     repo = "habitat";
@@ -52,6 +58,12 @@
     repo = "kilt";
     rev = "v0.4.1";
     sha256 = "1bhmmk4djnysf2fr0020dakn1730a33xzi10c8lg1a343x77rm64";
+  };
+  magic = {
+    owner = "naqvis";
+    repo = "magic.cr";
+    rev = "48388767a31b305ee15422caef01253667f8ec2f";
+    sha256 = "1j1j88ps0ii6ds3nikks72ldg32awnmphhsrxig6schfqlhr49ib";
   };
   pg = {
     owner = "will";

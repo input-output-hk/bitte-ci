@@ -50,7 +50,12 @@ module SimpleConfig
                 %env_key
               ))
             else
-              @{{ivar.id}} = %value.to_simple_option({{ivar.type}})
+              case %value
+              when {{ivar.type}}
+                @{{ivar.id}} = %value
+              else
+                @{{ivar.id}} = %value.to_simple_option({{ivar.type}})
+              end
             end
           {% end %}
         {% end %}
@@ -79,17 +84,24 @@ module SimpleConfig
           %secret = {{ann[:secret]}}
           %short = {{ann[:short]}}
           %long = {{ann[:long]}} || {{ivar.id.tr("_", "-").stringify}}
+          %default_value = {{ ivar.default_value }}
+          %help =
+            if %default_value
+              {{ann[:help]}} + " (default: #{%default_value})"
+            else
+              {{ann[:help]}}
+            end
 
           if %short && %long
-            parser.on "-#{%short}=VALUE", "--#{%long}=VALUE", {{ann[:help]}} do |value|
+            parser.on "-#{%short}=VALUE", "--#{%long}=VALUE", %help do |value|
               config[{{ivar.id.stringify}}] = value
             end
           elsif %short
-            parser.on "-#{%short}=VALUE", {{ann[:help]}} do |value|
+            parser.on "-#{%short}=VALUE", %help do |value|
               config[{{ivar.id.stringify}}] = value
             end
           elsif %long
-            parser.on "--#{%long}=VALUE", {{ann[:help]}} do |value|
+            parser.on "--#{%long}=VALUE", %help do |value|
               config[{{ivar.id.stringify}}] = value
             end
           end
@@ -105,15 +117,14 @@ module SimpleConfig
   end
 
   class Error < ::Exception
-    class MissingOption < Error; end
-
     def self.missing_flag(key : String, short : Char?, long : String?, env : String?)
-      notice = ["Missing value for the option '#{key}'. Please set it one of these ways:"]
+      notice = ["Missing value for the option '#{key}'."]
+      notice << "Please set it one of these ways:"
       notice << "in your config file with: '#{key}'"
       notice << "cli flag: '-#{short}'" if short
       notice << "cli flag: '--#{long}'" if long
       notice << "environment variable: '#{env}'" if env
-      Error::MissingOption.new(notice.join("\n"))
+      OptionParser::MissingOption.new(notice.join("\n"))
     end
   end
 end
@@ -151,5 +162,13 @@ class String
 
   def to_simple_option(k : UUID.class)
     UUID.new(self)
+  end
+
+  def to_simple_option(k : Hash(String, String).class)
+    if self[0]? == '{'
+      Hash(String, String).from_json(self)
+    else
+      split(' ').map { |pair| pair.split("=") }.to_h
+    end
   end
 end

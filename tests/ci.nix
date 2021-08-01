@@ -1,5 +1,28 @@
 { lib, pkgs, inputs, ... }:
 let
+  repo =
+    pkgs.runCommand "repo.sh" { buildInputs = [ pkgs.coreutils pkgs.git ]; } ''
+      export HOME=$PWD
+
+      git config --global init.defaultBranch master
+      git config --global user.email "test@example.com"
+      git config --global user.name "Test"
+
+      mkdir -p $out
+      cd $out
+      git init
+      cp ${ciCue} ci.cue
+      cp ${testFlake} flake.nix
+      cp ${../flake.lock} flake.lock
+      git add .
+      git commit -m 'inaugural commit'
+    '';
+
+  rev = builtins.readFile
+    (pkgs.runCommand "rev.sh" { buildInputs = [ pkgs.git ]; } ''
+      git -C ${repo} log --format=format:%H | head -1 > $out
+    '');
+
   pr = pkgs.writeText "pr.json" (builtins.toJSON {
     pull_request = {
       id = 1;
@@ -12,7 +35,7 @@ let
           full_name = "iog/ci";
           clone_url = "git://127.0.0.1:7070/";
         };
-        sha = "a949ab892bc2009c9cfa2d674eab418ac6fac406";
+        sha = rev;
         label = "";
         ref = "";
       };
@@ -22,7 +45,7 @@ let
           full_name = "iog/ci";
           clone_url = "git://127.0.0.1:7070/";
         };
-        sha = "a949ab892bc2009c9cfa2d674eab418ac6fac406";
+        sha = rev;
         label = "";
         ref = "";
       };
@@ -33,7 +56,7 @@ let
     public_url = "http://example.com";
     postgres_url = "postgres://bitte_ci@127.0.0.1:5432/bitte_ci";
     frontend_path = builtins.toString pkgs.bitte-ci-frontend;
-    github_user_content_base_url = "http://localhost:8080";
+    github_user_content_base_url = "http://localhost:9090";
     github_hook_secret_file =
       builtins.toFile "secret" "oos0kahquaiNaiciz8MaeHohNgaejien";
     nomad_base_url = "http://localhost:4646";
@@ -45,9 +68,10 @@ let
     runner_flake = "path:/bitte-ci";
   });
 
-  testJob = pkgs.writeShellScript "test.sh" ''
+  queueJob = pkgs.writeShellScript "test.sh" ''
     set -exuo pipefail
 
+    export PATH="${lib.makeBinPath [ pkgs.cue ]}:$PATH"
     ${pkgs.bitte-ci}/bin/bitte-ci queue --config ${bitteConfig} < ${pr}
   '';
 
@@ -58,21 +82,28 @@ let
 
     nomad status
 
-    status="$(nomad job status iog/ci#1:a949ab892bc2009c9cfa2d674eab418ac6fac406)"
+    status="$(nomad job status iog/ci#1:${rev})"
     echo "vvv STATUS vvv"
     echo "$status"
-    id="$(nomad job status iog/ci#1:a949ab892bc2009c9cfa2d674eab418ac6fac406 | tail -1 | awk '{print $1}')"
+    id="$(nomad job status iog/ci#1:${rev} | tail -1 | awk '{print $1}')"
     echo "vvv JOB vvv"
     job="$(nomad status "$id")"
     echo "$job"
 
-    echo "vvv LOGS PROMTAIL vvv"
+    echo "vvv LOGS PROMTAIL (stdout) vvv"
     nomad logs "$id" promtail
+    echo "vvv LOGS PROMTAIL (stderr) vvv"
     nomad logs -stderr "$id" promtail
 
-    echo "vvv LOGS RUNNER vvv"
+    echo "vvv LOGS RUNNER (stdout) vvv"
     nomad logs "$id" runner
+    echo "vvv LOGS RUNNER (stderr) vvv"
     nomad logs -stderr "$id" runner
+
+    echo "vvv LOGS ARTIFICER (stdout) vvv"
+    nomad logs "$id" artificer
+    echo "vvv LOGS ARTIFICER (stderr) vvv"
+    nomad logs -stderr "$id" artificer
 
     uuid="$(
       echo '{"channel":"pull_requests"}' \
@@ -100,6 +131,7 @@ let
         let
           overlay = final: prev: {
             bitte-ci = inputs.bitte-ci.packages.x86_64-linux.bitte-ci;
+            bitte-ci-static = inputs.bitte-ci.packages.x86_64-linux.bitte-ci-static;
           };
 
           pkgs = import nixpkgs {
@@ -135,14 +167,14 @@ let
   ciCue = pkgs.writeText "ci.cue" ''
     package ci
 
-    ci: steps: [
-      {
+    ci: steps: {
+      hello: {
         label: "hello"
         command: ["bash", "-c", "hello -t > /alloc/hello; hello -t"]
-        flakes: "path:/test-repo": ["hello"]
+        flakes: "git://127.0.0.1:7070/": ["hello"]
         outputs: ["/alloc/hello"]
       }
-    ]
+    }
   '';
 
   fakeGithub = pkgs.writeText "github.rb" ''
@@ -153,7 +185,6 @@ let
     trap('INT') { server.shutdown }
 
     server.mount_proc "/registry.json" do |req, res|
-      puts "Received registry request: #{req.inspect}"
       res.body = {flakes: []}.to_json
       res.status = 200
     end
@@ -163,6 +194,12 @@ let
       pp JSON.parse(req.body)
       res.body = "OK"
       res.status = 201
+    end
+
+    server.mount_proc "/iog/ci/${rev}/ci.cue" do |req, res|
+      puts "Received ci.cue request"
+      res.body = File.read("${ciCue}")
+      res.status = 200
     end
 
     server.start
@@ -180,7 +217,7 @@ in pkgs.nixosTest {
 
       # Nomad exec driver is incompatible with cgroups v2
       systemd.enableUnifiedCgroupHierarchy = false;
-      virtualisation.memorySize = 3 * 1024;
+      virtualisation.memorySize = 5 * 1024;
       virtualisation.diskSize = 2 * 1024;
 
       # dependencies required for the ci runner script
@@ -193,7 +230,9 @@ in pkgs.nixosTest {
         hello
         grafana-loki
 
+        crystal
         bitte-ci
+        bitte-ci-static
         file
       ];
 
@@ -204,11 +243,17 @@ in pkgs.nixosTest {
         websocat
         jq
         bat
+        git
       ];
 
       nix = {
         package = pkgs.nixFlakes;
-        registry.nixpkgs.flake = inputs.nixpkgs;
+
+        # registry.nixpkgs.flake = inputs.nixpkgs;
+        # registry.crystal-src.flake = inputs.crystal-src;
+
+        registry = lib.mapAttrs (name: flake: { inherit flake; }) inputs;
+
         extraOptions = ''
           experimental-features = nix-command flakes ca-references
           show-trace = true
@@ -217,27 +262,13 @@ in pkgs.nixosTest {
         '';
       };
 
-      systemd.services.fakeGithub = {
+      systemd.services.fake-github = {
         description = "Fake GitHub";
         before = [ "bitte-ci-server.service" ];
         wantedBy = [ "multi-user.target" ];
         path = with pkgs; [ ruby ];
         script = ''
           exec ruby ${fakeGithub}
-        '';
-      };
-
-      systemd.services.webfsd = {
-        before = [ "bitte-ci-server.service" ];
-        requires = [ "git-daemon.service" ];
-        wantedBy = [ "multi-user.target" ];
-        path = with pkgs; [ webfs git ];
-        environment = { HOME = "/root"; };
-        script = ''
-          set -exuo pipefail
-
-          mkdir -p /test-repo
-          exec webfsd -F -j -p 8080 -r /test-repo
         '';
       };
 
@@ -248,36 +279,14 @@ in pkgs.nixosTest {
         script = ''
           set -exuo pipefail
 
-          mkdir -p /test-repo/iog/ci
-          cd /test-repo
-
-          git config --global init.defaultBranch master
-          git config --global user.email "test@example.com"
-          git config --global user.name "Test"
-          git init
-          cp ${ciCue} ci.cue
-          cp ${testFlake} flake.nix
-          cp ${testFlakeLock} flake.lock
-          git add .
-          git commit -m 'inaugural commit'
-
-          ln -s ${
-            builtins.getFlake
-            "github:NixOS/nixpkgs?rev=aea7242187f21a120fe73b5099c4167e12ec9aab"
-          } nomad-nixpkgs
-          ln -s /test-repo /test-repo/iog/ci/a949ab892bc2009c9cfa2d674eab418ac6fac406
-          ls -la /test-repo/iog/ci/a949ab892bc2009c9cfa2d674eab418ac6fac406
-
-          git log | head
-
           exec git daemon \
             --listen=0.0.0.0 \
             --port=7070 \
             --verbose \
             --export-all \
-            --base-path=.git \
+            --base-path=${repo}/.git \
             --reuseaddr \
-            --strict-paths .git/
+            --strict-paths ${repo}/.git/
         '';
       };
 
@@ -301,8 +310,9 @@ in pkgs.nixosTest {
 
         bitte-ci = {
           enable = true;
+          package = pkgs.bitte-ci;
           postgresUrl = "postgres://bitte_ci@localhost:5432/bitte_ci";
-          githubUserContentUrl = "http://localhost:8080";
+          githubUserContentUrl = "http://localhost:9090";
           nomadUrl = "http://localhost:4646";
           publicUrl = "http://example.com";
           lokiUrl = "http://127.0.0.1:3100";
@@ -317,7 +327,7 @@ in pkgs.nixosTest {
         nomad = {
           enable = true;
           enableDocker = false;
-          extraPackages = with pkgs; [ nixFlakes ];
+          extraPackages = with pkgs; [ nixFlakes git ];
 
           # required for exec driver
           dropPrivileges = false;
@@ -391,29 +401,36 @@ in pkgs.nixosTest {
   testScript = ''
     start_all()
 
+    ci.wait_for_unit("git-daemon")
+
+    # wait for webfs to respond
+    ci.wait_for_unit("fake-github")
+    ci.wait_for_open_port(9090)
+
     # wait for nomad to respond
+    ci.wait_for_unit("nomad")
     ci.wait_for_open_port(4646)
 
     # wait for nomad to be leader
     ci.wait_for_console_text("client: node registration complete")
 
     ci.wait_for_unit("bitte-ci-migrate")
+    ci.wait_for_unit("bitte-ci-migrate")
     ci.wait_for_unit("bitte-ci-server")
     ci.wait_for_unit("bitte-ci-listener")
-
-    # wait for webfs to respond
-    ci.wait_for_open_port(8080)
-    ci.wait_for_open_port(9090)
 
     # wait for bitte ci server to respond
     ci.wait_for_open_port(9494)
 
     ci.log(ci.succeed("${bitteCiFlake}"))
-    ci.log(ci.succeed("nix build path:/test-repo#bitte-ci"))
+    ci.log(ci.succeed("nix build ${repo}#bitte-ci"))
 
-    ci.log(ci.succeed("${testJob}"))
-    # ci.log(ci.succeed("bat /var/lib/nomad/alloc/*/*/logs/*"))
-    ci.log(ci.wait_until_succeeds("${checkJob}"))
+    ci.log(ci.succeed("${queueJob}"))
+
+    ci.sleep(120)
+    ci.log(ci.succeed("bat /var/lib/nomad/alloc/*/*/logs/*"))
     ci.log(ci.succeed("${checkJob}"))
+
+    ci.log(ci.wait_until_succeeds("${checkJob}"))
   '';
 }

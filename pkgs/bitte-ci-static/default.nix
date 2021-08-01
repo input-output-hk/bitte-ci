@@ -1,5 +1,5 @@
-{ clang10Stdenv, linkFarm, lib, fetchFromGitHub, src, gmp, openssl, pkg-config
-, crystal, llvm_10, pcre, libevent, libyaml, zlib, file, libgit2 }:
+{ crystal, lib, linkFarm, fetchFromGitHub, src, pkg-config, pkgsStatic, pkgsMusl
+, zlib, libssh2, openssl, pcre }:
 let
   pname = "bitte-ci";
   version = "0.1.0";
@@ -8,13 +8,23 @@ let
     inherit name;
     path = fetchFromGitHub value;
   }) (import ../../shards.nix));
-in clang10Stdenv.mkDerivation {
+in pkgsMusl.clang10Stdenv.mkDerivation {
   inherit pname version;
   inherit src;
 
-  LLVM_CONFIG = "${llvm_10}/bin/llvm-config";
+  LLVM_CONFIG = "${pkgsMusl.llvm_10}/bin/llvm-config";
 
-  buildInputs = [ gmp openssl pcre libevent libyaml zlib file libgit2 ];
+  buildInputs = with pkgsStatic; [
+    libevent.dev
+    pcre.dev
+    bdwgc
+    libyaml
+    gmp
+    zlib
+    file
+    libgit2-static
+    libssh2
+  ];
 
   nativeBuildInputs = [ pkg-config crystal ];
 
@@ -23,10 +33,12 @@ in clang10Stdenv.mkDerivation {
     mkdir -p $out/bin
     crystal build ./src/bitte_ci.cr \
       -o $out/bin/bitte-ci \
-      --progress \
+      --static \
       --debug \
+      --release \
       --verbose \
-      --threads "$NIX_BUILD_CORES"
+      --threads "$NIX_BUILD_CORES" \
+      --link-flags "-L${pkgsStatic.bdwgc}/lib -L${pkgsStatic.libssh2}/lib"
   '';
 
   installPhase = ":";

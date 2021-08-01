@@ -36,6 +36,10 @@ shards:
     git: https://github.com/jeromegn/kilt.git
     version: 0.4.1
 
+  magic:
+    git: https://github.com/naqvis/magic.cr.git
+    version: 0.1.0+git.commit.48388767a31b305ee15422caef01253667f8ec2f
+
   pg:
     git: https://github.com/will/crystal-pg.git
     version: 0.23.2

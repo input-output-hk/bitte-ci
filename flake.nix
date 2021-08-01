@@ -6,14 +6,30 @@
     bitte.url = "github:input-output-hk/bitte/nix-driver-with-profiles";
     arion.url = "github:hercules-ci/arion";
     bitte-ci-frontend.url = "github:input-output-hk/bitte-ci-frontend";
+
+    crystal-src = {
+      url =
+        "https://github.com/crystal-lang/crystal/releases/download/1.1.1/crystal-1.1.1-1-linux-x86_64.tar.gz";
+      flake = false;
+    };
+
+    libatomic_ops = {
+      url =
+        "https://github.com/ivmai/libatomic_ops/releases/download/v7.6.10/libatomic_ops-7.6.10.tar.gz";
+      flake = false;
+    };
+
+    bdwgc-src = {
+      url =
+        "https://github.com/ivmai/bdwgc/releases/download/v8.0.4/gc-8.0.4.tar.gz";
+      flake = false;
+    };
   };
 
   outputs = { self, ... }@inputs:
     let
-      overlay = final: prev: {
-        nomad = inputs.bitte.legacyPackages.${prev.system}.nomad;
-
-        bitte-ci = prev.callPackage ./pkgs/bitte-ci {
+      overlay = final: prev:
+        let
           src = prev.lib.sourceFilesBySuffices ./. [
             ".cr"
             ".lock"
@@ -21,24 +37,46 @@
             ".cue"
             ".fixture"
           ];
+        in {
+          nomad = inputs.bitte.legacyPackages.${prev.system}.nomad;
+
+          bitte-ci = prev.callPackage ./pkgs/bitte-ci { inherit src; };
+
+          http-parser-static = prev.callPackage ./pkgs/http-parser { };
+
+          libgit2-static = final.callPackage ./pkgs/libgit2 {
+            inherit (prev.darwin.apple_sdk.frameworks) Security;
+          };
+
+          bitte-ci-static =
+            final.callPackage ./pkgs/bitte-ci-static { inherit src; };
+
+          bitte-ci-frontend =
+            inputs.bitte-ci-frontend.defaultPackage.${prev.system};
+
+          crystal = final.callPackage ./pkgs/crystal {
+            oldCrystal = prev.crystal;
+            src = inputs.crystal-src;
+          };
+
+          bdwgc = final.callPackage ./pkgs/bdwgc {
+            src = inputs.bdwgc-src;
+            libatomic_ops = inputs.libatomic_ops;
+          };
+
+          arion = inputs.arion.defaultPackage.${prev.system};
+
+          reproxy = prev.callPackage ./pkgs/reproxy { };
+
+          ngrok = prev.callPackage ./pkgs/ngrok { };
+
+          tests = final.callPackage ./tests { inherit inputs; };
+
+          project = inputs.arion.lib.build {
+            modules = [ ./arion-compose.nix ];
+            pkgs = final;
+          };
         };
-
-        bitte-ci-frontend =
-          inputs.bitte-ci-frontend.defaultPackage.${prev.system};
-
-        arion = inputs.arion.defaultPackage.${prev.system};
-
-        reproxy = prev.callPackage ./pkgs/reproxy { };
-
-        ngrok = prev.callPackage ./pkgs/ngrok { };
-
-        tests = final.callPackage ./tests { inherit inputs; };
-
-        project = inputs.arion.lib.build {
-          modules = [ ./arion-compose.nix ];
-          pkgs = final;
-        };
-      };
 
       pkgs = import inputs.nixpkgs {
         system = "x86_64-linux";
@@ -81,7 +119,14 @@
           crystal2nix
           openssl
           pkg-config
-          gmp
+          gmp.dev
+          pcre
+          libevent
+          libyaml
+          zlib
+          file
+          libgit2
+          libssh2
         ];
       };
     };

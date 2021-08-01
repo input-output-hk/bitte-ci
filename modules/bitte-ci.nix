@@ -5,6 +5,11 @@ in {
     services.bitte-ci = {
       enable = lib.mkEnableOption "Enable Bitte CI";
 
+      package = lib.mkOption {
+        type = lib.types.package;
+        default = pkgs.bitte-ci-static;
+      };
+
       publicUrl = lib.mkOption { type = lib.types.str; };
 
       postgresUrl = lib.mkOption { type = lib.types.str; };
@@ -98,12 +103,12 @@ in {
       after =
         [ "bitte-ci-migrate.service" "loki.service" "postgresql.service" ];
       wantedBy = [ "multi-user.target" ];
-      path = with pkgs; [ bitte-ci ];
-      script = ''
-        exec bitte-ci server ${serverFlags}
-      '';
+      path = with pkgs; [ cue ];
+
+      # environment.KEMAL_ENV = "production";
 
       serviceConfig = {
+        ExecStart = "${cfg.package}/bin/bitte-ci server ${serverFlags}";
         Restart = "on-failure";
         RestartSec = "5s";
       };
@@ -118,12 +123,8 @@ in {
         "postgresql.service"
       ];
       wantedBy = [ "multi-user.target" ];
-      path = with pkgs; [ bitte-ci ];
-      script = ''
-        exec bitte-ci listen ${listenFlags}
-      '';
-
       serviceConfig = {
+        ExecStart = "${cfg.package}/bin/bitte-ci listen ${listenFlags}";
         Restart = "on-failure";
         RestartSec = "5s";
       };
@@ -137,12 +138,10 @@ in {
         "bitte-ci-server.service"
         "multi-user.target"
       ];
-      path = with pkgs; [ bitte-ci ];
-      script = ''
-        exec bitte-ci migrate ${migrateFlags}
-      '';
+      script = "";
 
       serviceConfig = {
+        ExecStart = "${cfg.package}/bin/bitte-ci migrate ${migrateFlags}";
         Type = "oneshot";
         RemainAfterExit = true;
         Restart = "on-failure";

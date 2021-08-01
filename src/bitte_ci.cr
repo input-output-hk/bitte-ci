@@ -11,51 +11,69 @@ module BitteCI
     Migrate
     Queue
     Listen
-    Artifice
+    Command
+    Prepare
   end
 
   def self.parse_options
     action = BitteCI::Cmd::None
 
-    server_flags = {} of String => String
-    queue_flags = {} of String => String
-    migrate_flags = {} of String => String
-    listen_flags = {} of String => String
-    artifice_flags = {} of String => String
-
+    flags = {} of String => String
     config_file = "bitte_ci.json" if File.file?("bitte_ci.json")
 
     op = OptionParser.new do |parser|
       parser.banner = "Usage: bitte-ci"
 
+      parser.invalid_option do |opt|
+        puts parser
+        puts
+        STDERR.puts "Option invalid: #{opt}"
+        parser.stop
+        exit 1
+      end
+
+      parser.missing_option do |opt|
+        puts parser
+        puts
+        STDERR.puts "Option missing: #{opt}"
+        parser.stop
+        exit 1
+      end
+
       parser.on "server", "Start the webserver" do
         parser.banner = "Usage: bitte-ci"
         action = BitteCI::Cmd::Serve
-        BitteCI::Server::Config.option_parser(parser, server_flags)
+        BitteCI::Server::Config.option_parser(parser, flags)
       end
 
       parser.on "migrate", "Migrate the DB" do
         parser.banner = "Usage: bitte-ci migrate"
         action = BitteCI::Cmd::Migrate
-        BitteCI::Migrator::Config.option_parser(parser, migrate_flags)
+        BitteCI::Migrator::Config.option_parser(parser, flags)
       end
 
       parser.on "queue", "queue the PR piped into stdin or passed as argument" do
         parser.banner = "Usage: bitte-ci queue"
         action = BitteCI::Cmd::Queue
-        BitteCI::Runner::Config.option_parser(parser, queue_flags)
+        BitteCI::Runner::Config.option_parser(parser, flags)
       end
 
       parser.on "listen", "Start nomad event listener" do
         parser.banner = "Usage: bitte-ci listen"
         action = BitteCI::Cmd::Listen
-        BitteCI::Listener::Config.option_parser(parser, listen_flags)
+        BitteCI::Listener::Config.option_parser(parser, flags)
       end
 
-      parser.on "artifice", "Store artifacts from an allocation" do
-        parser.banner = "Usage: bitte-ci artifice"
-        action = BitteCI::Cmd::Artifice
-        BitteCI::Artificer::Config.option_parser(parser, artifice_flags)
+      parser.on "command", "Executor for steps within Nomad" do
+        parser.banner = "Usage: bitte-ci command"
+        action = BitteCI::Cmd::Command
+        BitteCI::Commander::Config.option_parser(parser, flags)
+      end
+
+      parser.on "prepare", "Prepare the repository in /alloc" do
+        parser.banner = "Usage: bitte-ci prepare"
+        action = BitteCI::Cmd::Prepare
+        BitteCI::Preparator::Config.option_parser(parser, flags)
       end
 
       parser.on "-h", "--help", "Show this help" do
@@ -73,26 +91,30 @@ module BitteCI
     case action
     in BitteCI::Cmd::Serve
       Log.info { "Starting server" }
-      server_config = BitteCI::Server::Config.new(server_flags, config_file)
+      server_config = BitteCI::Server::Config.new(flags, config_file)
       Clear::SQL.init(server_config.postgres_url.to_s)
       BitteCI::Server.start(server_config)
       Kemal.run port: 9494
     in BitteCI::Cmd::Migrate
-      BitteCI::Migrator.run(BitteCI::Migrator::Config.new(migrate_flags, config_file))
+      BitteCI::Migrator.run(BitteCI::Migrator::Config.new(flags, config_file))
     in BitteCI::Cmd::Queue
       Log.info { "Adding PR to job queue" }
       arg = ARGV[0]? ? File.read(ARGV[0]) : STDIN
-      BitteCI::Runner.run(arg, BitteCI::Runner::Config.new(queue_flags, config_file))
+      BitteCI::Runner.run(arg, BitteCI::Runner::Config.new(flags, config_file))
     in BitteCI::Cmd::Listen
       Log.info { "Starting Nomad event listener" }
-      BitteCI::Listener.listen(BitteCI::Listener::Config.new(listen_flags, config_file))
-    in BitteCI::Cmd::Artifice
-      Log.info { "Starting artificer" }
-      BitteCI::Artificer.run(BitteCI::Artificer::Config.new(artifice_flags, config_file))
+      BitteCI::Listener.listen(BitteCI::Listener::Config.new(flags, config_file))
+    in BitteCI::Cmd::Command
+      BitteCI::Commander.run(BitteCI::Commander::Config.new(flags, config_file))
+    in BitteCI::Cmd::Prepare
+      BitteCI::Preparator.run(BitteCI::Preparator::Config.new(flags, config_file))
     in BitteCI::Cmd::None
       puts op
       exit 1
     end
+  rescue e : OptionParser::MissingOption
+    STDERR.puts e
+    exit 1
   end
 end
 

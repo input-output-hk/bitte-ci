@@ -86,10 +86,13 @@ module BitteCI
     end
 
     def run
-      @job_config.ci.steps.each do |step|
-        Log.info &.emit("Queue Job", step: step.to_json)
-        NomadJob.new(pr: @pr, raw: @raw, job_config: @job_config, config: @config.for_nomad_job, step: step).queue!
-      end
+      Log.info &.emit("Queue Job", step: @job_config.to_json)
+      NomadJob.new(
+        pr: @pr,
+        raw: @raw,
+        job_config: @job_config,
+        config: @config.for_nomad_job,
+      ).queue!
     end
 
     def export_job_config
@@ -218,7 +221,12 @@ module BitteCI
       end
     end
 
-    def initialize(@pr : GithubHook::PullRequest, @raw : String, @job_config : JobConfig, @config : NomadJob::Config, @step : JobConfig::Step)
+    def initialize(
+      @pr : GithubHook::PullRequest,
+      @raw : String,
+      @job_config : JobConfig,
+      @config : NomadJob::Config
+    )
       @loki_id = UUID.random
     end
 
@@ -287,25 +295,31 @@ module BitteCI
       {Job: job}
     end
 
-    def group_name
-      "#{@pr.base.repo.full_name}##{@pr.number}:#{@pr.head.sha}"
+    def job_id
+      "#{@pr.base.repo.full_name}##{@pr.number}-#{@pr.head.sha}"
+    end
+
+    def job_name
+      job_id
+    end
+
+    def task_group_name
+      job_id
     end
 
     def job
       {
         Namespace:   nil,
-        ID:          group_name,
-        Name:        group_name,
+        ID:          job_id,
+        Name:        job_name,
         Type:        "batch",
-        Priority:    @step.priority,
+        Priority:    40,
         Datacenters: @config.nomad_datacenters,
         TaskGroups:  [
           {
-            Name:  group_name,
-            Count: 1,
-            Tasks: [
-              runner, promtail, artificer,
-            ],
+            Name:             task_group_name,
+            Count:            1,
+            Tasks:            tasks,
             ReschedulePolicy: {
               Attempts:      3,
               DelayFunction: "exponential",
@@ -316,8 +330,8 @@ module BitteCI
             },
             EphemeralDisk: {
               SizeMB:  1024,
-              Migrate: true,
-              Sticky:  true,
+              Migrate: false,
+              Sticky:  false,
             },
             Networks: [{Mode: "host"}],
           },
@@ -325,177 +339,113 @@ module BitteCI
       }
     end
 
-    # combine the required dependencies for the runner.sh with
-    def runner_deps
-      deps = %w[bashInteractive coreutils cacert gnugrep git].map { |a| "#{@config.runner_flake}##{a}" }
-      original = @step.flakes.flat_map { |k, vs| vs.map { |v| "#{k}##{v}" } }
-      (deps + original).uniq
+    def tasks
+      default = @job_config.ci.steps
+      prepare_config.merge(default).map do |name, step_config|
+        Task.new(@pr, name, step_config, @config.runner_flake, @config.loki_base_url)
+      end
     end
 
-    RUNNER_TEMPLATE = <<-RUNNER
-    set -exuo pipefail
+    class Task
+      def initialize(
+        @pr : GithubHook::PullRequest,
+        @name : String,
+        @config : JobConfig::Step,
+        @runner_flake : URI,
+        @loki_base_url : URI
+      )
+      end
 
-    echo "$SSL_CERT_FILE"
+      # combine the required dependencies for the runner.sh with
+      def dependencies
+        deps = %w[bashInteractive coreutils cacert gnugrep git bitte-ci-static].map { |a| "#{@runner_flake}##{a}" }
+        original = @config.flakes.flat_map { |k, vs| vs.map { |v| "#{k}##{v}" } }
+        (deps + original).uniq
+      end
 
-    dir="/local/$FULL_NAME"
+      def definition
+        command = [@config.command].flatten
+        args = command.size > 1 ? command[1..-1] : [] of String
 
-    rm -rf "$dir"
-    mkdir -p "$dir"
-    cd "$dir"
+        {
+          Name:   @name,
+          Driver: "exec",
 
-    # create and initialize an empty repository
-    git init
+          Config: {
+            flake_deps: dependencies,
+            command:    "/bin/bitte-ci",
+            args:       [
+              "command",
+              "--name", @name,
+              "--command", command[0],
+              "--args", args.to_json,
+              "--loki-base-url", @loki_base_url.to_s,
+              "--after", @config.after.to_json,
+            ],
+          },
 
-    # add a remote named origin for the repository at <repository>
-    git remote add origin "$CLONE_URL"
+          Env: {
+            "PATH"          => "/bin",
+            "SSL_CERT_FILE" => "/current-alloc/etc/ssl/certs/ca-bundle.crt",
+            "SHA"           => @pr.head.sha,
+            "CLONE_URL"     => @pr.head.repo.clone_url,
+            "LABEL"         => @pr.head.label,
+            "REF"           => @pr.head.ref,
+            "FULL_NAME"     => @pr.base.repo.full_name,
+            # "GIT_TRACE"        => "2",
+            # "GIT_CURL_VERBOSE" => "2",
+          }.merge(@config.env),
 
-    # fetch a commit using its hash
-    git fetch origin "$SHA"
+          ShutdownDelay: 0,
+          KillSignal:    "SIGTERM",
 
-    # reset repository to that commit
-    git reset --hard FETCH_HEAD
+          Resources: {
+            CPU:      @config.cpu,
+            MemoryMB: @config.memory,
+          },
 
-    exec "$@"
-    RUNNER
+          RestartPolicy: {
+            Interval: Second * 60,
+            Attempts: 5,
+            Delay:    Second * 60,
+            Mode:     "delay",
+          },
 
-    def runner
+          Templates: [
+            {
+              DestPath:     "local/pr.json",
+              EmbeddedTmpl: @pr.to_json,
+            },
+          ],
+
+          Vault: if @config.vault
+            {
+              ChangeMode: "noop",
+              Env:        true,
+              Policies:   ["nomad-cluster"],
+            }
+          end,
+        }
+      end
+
+      def to_json(b)
+        definition.to_json(b)
+      end
+    end
+
+    def prepare_config
       {
-        Name:   "runner",
-        Driver: "exec",
-        Config: {
-          flake_deps: runner_deps,
-          command:    "/bin/bash",
-          args:       ["/local/runner.sh"] + [@step.command].flatten,
-        },
-        Env: @step.env.merge({
-          "PATH"             => "/bin",
-          "SSL_CERT_FILE"    => "/current-alloc/etc/ssl/certs/ca-bundle.crt",
-          "SHA"              => @pr.head.sha,
-          "CLONE_URL"        => @pr.head.repo.clone_url,
-          "LABEL"            => @pr.head.label,
-          "REF"              => @pr.head.ref,
-          "FULL_NAME"        => @pr.base.repo.full_name,
-          "GIT_TRACE"        => "2",
-          "GIT_CURL_VERBOSE" => "2",
-        }),
-        KillSignal: "SIGINT",
-        Resources:  {
-          CPU:      @step.cpu,
-          MemoryMB: @step.memory,
-        },
-        RestartPolicy: {
-          Interval: Second * 60,
-          Attempts: 5,
-          Delay:    Second * 60,
-          Mode:     "delay",
-        },
-        ShutdownDelay: 0,
-        Leader:        true,
-        Templates:     [
-          {
-            DestPath:     "local/runner.sh",
-            EmbeddedTmpl: RUNNER_TEMPLATE,
-          },
-          {
-            DestPath:     "local/pr.json",
-            EmbeddedTmpl: @pr.to_json,
-          },
-        ],
-        Vault: if @step.vault
-          {
-            ChangeMode: "noop",
-            Env:        true,
-            Policies:   ["nomad-cluster"],
-          }
-        end,
+        "prepare" => JobConfig::Step.new(
+          label: "Git checkout to /alloc/repo",
+          command: ["/bin/bitte-ci", "prepare"],
+          enable: true,
+          vault: false,
+          cpu: 3000u32,
+          memory: 3u32 * 1024,
+          lifecycle: "prestart",
+          sidecar: false,
+        ),
       }
-    end
-
-    # combine the required dependencies for the runner.sh with
-    def artificer_deps
-      %w[bitte-ci file].map { |a| "#{@config.runner_flake}##{a}" }
-    end
-
-    def artificer
-      {
-        Name:   "artificer",
-        Driver: "exec",
-        Config: {
-          flake_deps: artificer_deps,
-          command:    "/bin/bitte-ci",
-          args:       ["artifice", "--postgres-url", @config.postgres_url.to_s, "--outputs", @step.outputs.to_json],
-        },
-        Env: {
-          PATH: "/bin",
-        },
-        Resources: {
-          CPU:      100,
-          MemoryMB: 128,
-        },
-        Lifecycle: {
-          Hook:    "poststop",
-          Sidecar: true,
-        },
-        Leader:    false,
-        Templates: [
-          {
-            DestPath:     "local/pr.json",
-            EmbeddedTmpl: @pr.to_json,
-          },
-        ],
-      }
-    end
-
-    def promtail
-      {
-        Name:   "promtail",
-        Driver: "exec",
-        Config: {
-          flake:   @config.runner_flake.to_s + "#grafana-loki",
-          command: "/bin/promtail",
-          args:    ["-config.file", "local/config.yaml"],
-        },
-        Lifecycle: {
-          Hook:    "prestart",
-          Sidecar: true,
-        },
-        KillSignal: "SIGINT",
-        Resources:  {
-          CPU:      100,
-          MemoryMB: 100,
-        },
-        ShutdownDelay: Second * 10,
-        Leader:        false,
-        Templates:     [
-          {
-            DestPath:     "local/config.yaml",
-            EmbeddedTmpl: promtail_config,
-          },
-        ],
-      }
-    end
-
-    def promtail_config
-      nomad_labels = %w[alloc_id alloc_index alloc_name dc group_name job_id job_name job_parent_id namespace region]
-      env_labels = nomad_labels.map { |label| ["nomad_#{label}", %({{ env "NOMAD_#{label.upcase}" }})] }.to_h
-      env_labels["bitte_ci_id"] = @loki_id.to_s
-      env_labels["__path__"] = "/alloc/logs/*.std*.[0-9]*"
-
-      {
-        server: {
-          http_listen_port: 0,
-          grpc_listen_port: 0,
-        },
-        positions:      {filename: "/local/positions.yaml"},
-        client:         {url: "#{@config.loki_base_url}/loki/api/v1/push"},
-        scrape_configs: [
-          {
-            job_name:        @loki_id.to_s,
-            pipeline_stages: nil,
-            static_configs:  [{labels: env_labels}],
-          },
-        ],
-      }.to_yaml
     end
   end
 end

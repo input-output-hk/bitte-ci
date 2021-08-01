@@ -276,7 +276,7 @@ module BitteCI
         if output
           env.response.headers["Content-Type"] = "application/octet-stream"
           env.response.headers["Content-Disposition"] = %(attachment; filename="#{File.basename(output.path)}")
-          output.data
+          File.read(File.join("output", output.sha256))
         else
           halt env, status_code: 404, response: "Not Found"
         end
@@ -284,6 +284,10 @@ module BitteCI
 
       post "/api/v1/github" do |env|
         BitteCI::Trigger.handle(config, env)
+      end
+
+      put "/api/v1/output" do |env|
+        BitteCI::Artificer.handle(config, env)
       end
 
       %w[pull_requests pull_request build allocation].each do |sub|

@@ -75,3 +75,12 @@ class Migration2
     end
   end
 end
+
+class Migration3
+  include Clear::Migration
+
+  def change(direction)
+    drop_column "outputs", "data", "bytea"
+    add_column "outputs", "sha256", "text", nullable: false
+  end
+end

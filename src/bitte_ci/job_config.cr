@@ -10,7 +10,7 @@ module BitteCI
       include JSON::Serializable
 
       property version : UInt8
-      property steps : Array(Step)
+      property steps : Hash(String, Step)
     end
 
     class Step
@@ -23,9 +23,27 @@ module BitteCI
       property vault : Bool
       property cpu : UInt32 = 100
       property memory : UInt32 = 300
-      property priority : UInt32 = 50
       property outputs : Array(String) = [] of String
       property env : Hash(String, String) = {} of String => String
+      property lifecycle : String?
+      property sidecar : Bool?
+      property after : Array(String) = [] of String
+
+      def initialize(
+        @label,
+        @command,
+        @enable,
+        @vault,
+        @cpu,
+        @memory,
+        @lifecycle,
+        @sidecar,
+        @after = [] of String,
+        @flakes = {} of String => Array(String),
+        @outputs = [] of String,
+        @env = {} of String => String
+      )
+      end
     end
   end
 end

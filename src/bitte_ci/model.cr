@@ -125,7 +125,7 @@ class Output
   include Clear::Model
 
   primary_key type: :uuid
-  column data : Bytes
+  column sha256 : String
   column size : UInt64
   column created_at : Time
   column alloc_id : UUID
@@ -138,27 +138,3 @@ class Output
     {id: id, created_at: created_at, alloc_id: alloc_id, size: size.humanize, path: path, mime: mime}.inspect
   end
 end
-
-# Convert from bytea column to Crystal's Bytes
-class Clear::Model::Converter::BytesConverter
-  def self.to_column(x : String | Bytes | Nil) : Bytes?
-    case x
-    in String
-      x.to_slice
-    in Bytes
-      x
-    in Nil
-      nil
-    end
-  end
-
-  def self.to_column(x)
-    raise Clear::ErrorMessages.converter_error(x.class.name, "Bytes")
-  end
-
-  def self.to_db(x : Bytes?)
-    x
-  end
-end
-
-Clear::Model::Converter.add_converter("Bytes", Clear::Model::Converter::BytesConverter)
