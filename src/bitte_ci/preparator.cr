@@ -1,5 +1,11 @@
+require "log"
 require "socket"
-require "uuid"
+require "file_utils"
+require "digest"
+
+require "./uuid"
+require "./libgit2"
+require "./loki"
 require "./simple_config"
 
 module BitteCI
@@ -25,6 +31,9 @@ module BitteCI
       @[Option(help: "git checkout SHA")]
       property sha : String
 
+      @[Option(help: "URL to reach the bitte-ci server for output uploads")]
+      property public_url : URI
+
       # Everything below here is usually set by Nomad through environment variables
 
       @[Option(help: "Allocation ID of the task")]
@@ -43,7 +52,7 @@ module BitteCI
       property nomad_group_name : String
 
       @[Option(help: "Job's ID")]
-      property nomad_job_id : UUID
+      property nomad_job_id : String
 
       @[Option(help: "Job's name")]
       property nomad_job_name : String
@@ -64,7 +73,7 @@ module BitteCI
           "nomad_alloc_name"    => nomad_alloc_name,
           "nomad_dc"            => nomad_dc,
           "nomad_group_name"    => nomad_group_name,
-          "nomad_job_id"        => nomad_job_id.to_s,
+          "nomad_job_id"        => nomad_job_id,
           "nomad_job_name"      => nomad_job_name,
           "nomad_job_parent_id" => nomad_job_parent_id.to_s,
           "nomad_namespace"     => nomad_namespace,
@@ -84,23 +93,17 @@ module BitteCI
     def run
       Log.info { "Starting Preparator" }
 
-      path = "/alloc/repo"
-      FileUtils.mkdir_p path
-
       @loki.start do
-        repo = Git.clone(@config.clone_url.to_s, path)
+        Git.init
+        repo = Git.clone(@config.clone_url.to_s, "/alloc/repo")
         Git.reset(repo, @config.sha)
 
+        # TODO: replicate this approach again for faster clones
         # sh("git", "-C", repo, "init")
         # sh("git", "-C", repo, "remote", "add", "origin", @config.clone_url.to_s)
         # sh("git", "-C", repo, "fetch", "origin", @config.sha)
         # sh("git", "-C", repo, "reset", "--hard", "FETCH_HEAD")
       end
-    end
-
-    def sh(cmd, *args)
-      result = @loki.sh(cmd, args: args)
-      exit result.exit_status unless result.success?
     end
   end
 end

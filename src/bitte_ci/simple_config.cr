@@ -14,6 +14,7 @@ module SimpleConfig
 
       {% for ivar in @type.instance_vars %}
         {% ann = ivar.annotation(@type.constant("Option")) %}
+        {% raise "Annotation for Option #{ivar.id} missing" unless ann %}
         {% if ann && ann[:secret] %}
           %file_key = "{{ivar}}_file"
           %file_env_key = "{{ann[:env]}}_FILE" || %file_key.upcase
@@ -39,7 +40,11 @@ module SimpleConfig
             if %value.nil?
               @{{ivar.id}} = nil
             else
-              @{{ivar.id}} = %value.to_simple_option({{ivar.type.union_types.reject { |t| t == Nil }.join(" | ").id}})
+              @{{ivar.id}} = show_detailed_error({{ivar.stringify}}, %value.inspect) {
+                %value.to_simple_option(
+                  {{ivar.type.union_types.reject { |t| t == Nil }.join(" | ").id}}
+                )
+              }
             end
           {% else %}
             if %value.nil?
@@ -54,12 +59,22 @@ module SimpleConfig
               when {{ivar.type}}
                 @{{ivar.id}} = %value
               else
-                @{{ivar.id}} = %value.to_simple_option({{ivar.type}})
+                @{{ivar.id}} = show_detailed_error({{ivar.stringify}}, %value.inspect) {
+                  %value.to_simple_option(
+                    {{ivar.type}}
+                  )
+                }
               end
             end
           {% end %}
         {% end %}
       {% end %}
+    end
+
+    private def show_detailed_error(name, insp)
+      yield
+    rescue e : ArgumentError
+      raise "While parsing the option #{name}, value was #{insp}: #{e.inspect}"
     end
 
     macro included

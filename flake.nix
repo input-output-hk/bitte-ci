@@ -40,16 +40,21 @@
         in {
           nomad = inputs.bitte.legacyPackages.${prev.system}.nomad;
 
-          bitte-ci = prev.callPackage ./pkgs/bitte-ci { inherit src; };
-
           http-parser-static = prev.callPackage ./pkgs/http-parser { };
 
-          libgit2-static = final.callPackage ./pkgs/libgit2 {
+          libgit2 = final.callPackage ./pkgs/libgit2 {
             inherit (prev.darwin.apple_sdk.frameworks) Security;
           };
 
-          bitte-ci-static =
-            final.callPackage ./pkgs/bitte-ci-static { inherit src; };
+          bitte-ci = prev.callPackage ./pkgs/bitte-ci { inherit src; };
+
+          bitte-ci-static = final.callPackage ./pkgs/bitte-ci {
+            inherit src;
+            inherit (prev.pkgsMusl) clang10Stdenv llvm_10;
+            inherit (prev.pkgsStatic)
+              gmp openssl pcre libevent libyaml zlib file libgit2 libssh2 bdwgc;
+            static = true;
+          };
 
           bitte-ci-frontend =
             inputs.bitte-ci-frontend.defaultPackage.${prev.system};
@@ -88,6 +93,8 @@
       legacyPackages.x86_64-linux = pkgs;
 
       packages.x86_64-linux.bitte-ci = pkgs.bitte-ci;
+      packages.x86_64-linux.bitte-ci-prepare = pkgs.bitte-ci-prepare;
+      packages.x86_64-linux.bitte-ci-static = pkgs.bitte-ci-static;
 
       defaultPackage.x86_64-linux = self.packages.x86_64-linux.bitte-ci;
 

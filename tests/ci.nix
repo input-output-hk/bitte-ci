@@ -53,7 +53,7 @@ let
   });
 
   bitteConfig = pkgs.writeText "bitte.json" (builtins.toJSON {
-    public_url = "http://example.com";
+    public_url = "http://127.0.0.1:9494";
     postgres_url = "postgres://bitte_ci@127.0.0.1:5432/bitte_ci";
     frontend_path = builtins.toString pkgs.bitte-ci-frontend;
     github_user_content_base_url = "http://localhost:9090";
@@ -82,34 +82,26 @@ let
 
     nomad status
 
-    status="$(nomad job status iog/ci#1:${rev})"
+    status="$(nomad job status iog/ci#1-${rev})"
     echo "vvv STATUS vvv"
     echo "$status"
-    id="$(nomad job status iog/ci#1:${rev} | tail -1 | awk '{print $1}')"
+    id="$(nomad job status iog/ci#1-${rev} | tail -1 | awk '{print $1}')"
     echo "vvv JOB vvv"
     job="$(nomad status "$id")"
     echo "$job"
 
-    echo "vvv LOGS PROMTAIL (stdout) vvv"
-    nomad logs "$id" promtail
-    echo "vvv LOGS PROMTAIL (stderr) vvv"
-    nomad logs -stderr "$id" promtail
-
-    echo "vvv LOGS RUNNER (stdout) vvv"
-    nomad logs "$id" runner
-    echo "vvv LOGS RUNNER (stderr) vvv"
-    nomad logs -stderr "$id" runner
-
-    echo "vvv LOGS ARTIFICER (stdout) vvv"
-    nomad logs "$id" artificer
-    echo "vvv LOGS ARTIFICER (stderr) vvv"
-    nomad logs -stderr "$id" artificer
+    systemd-cat bat /var/lib/nomad/alloc/*/*/logs/*
 
     uuid="$(
       echo '{"channel":"pull_requests"}' \
         | websocat -B 1000000 ws://0.0.0.0:9494/ci/api/v1/socket \
         | jq -r '.value[0].builds[0].id'
     )"
+
+    echo '{"channel":"build"}' \
+      | jq -c --arg uuid "$uuid" '.uuid = $uuid' \
+      | websocat -B 1000000 ws://0.0.0.0:9494/ci/api/v1/socket \
+      | systemd-cat jq
 
     echo '{"channel":"build"}' \
       | jq -c --arg uuid "$uuid" '.uuid = $uuid' \
@@ -131,7 +123,6 @@ let
         let
           overlay = final: prev: {
             bitte-ci = inputs.bitte-ci.packages.x86_64-linux.bitte-ci;
-            bitte-ci-static = inputs.bitte-ci.packages.x86_64-linux.bitte-ci-static;
           };
 
           pkgs = import nixpkgs {
@@ -171,7 +162,7 @@ let
       hello: {
         label: "hello"
         command: ["bash", "-c", "hello -t > /alloc/hello; hello -t"]
-        flakes: "git://127.0.0.1:7070/": ["hello"]
+        flakes: "git://127.0.0.1:7070/": ["bash", "hello"]
         outputs: ["/alloc/hello"]
       }
     }
@@ -232,7 +223,6 @@ in pkgs.nixosTest {
 
         crystal
         bitte-ci
-        bitte-ci-static
         file
       ];
 
@@ -314,7 +304,7 @@ in pkgs.nixosTest {
           postgresUrl = "postgres://bitte_ci@localhost:5432/bitte_ci";
           githubUserContentUrl = "http://localhost:9090";
           nomadUrl = "http://localhost:4646";
-          publicUrl = "http://example.com";
+          publicUrl = "http://127.0.0.1:9494";
           lokiUrl = "http://127.0.0.1:3100";
           githubHookSecretFile =
             builtins.toFile "secret" "oos0kahquaiNaiciz8MaeHohNgaejien";
@@ -426,10 +416,6 @@ in pkgs.nixosTest {
     ci.log(ci.succeed("nix build ${repo}#bitte-ci"))
 
     ci.log(ci.succeed("${queueJob}"))
-
-    ci.sleep(120)
-    ci.log(ci.succeed("bat /var/lib/nomad/alloc/*/*/logs/*"))
-    ci.log(ci.succeed("${checkJob}"))
 
     ci.log(ci.wait_until_succeeds("${checkJob}"))
   '';

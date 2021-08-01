@@ -1,3 +1,5 @@
+require "http/client"
+require "log"
 require "uri"
 
 module BitteCI
@@ -35,9 +37,10 @@ module BitteCI
 
     def start(&block)
       start
-      yield
+      result = yield
     ensure
       stop
+      result
     end
 
     def stop
@@ -57,23 +60,13 @@ module BitteCI
     end
 
     def sh(cmd, args)
-      Process.run(
-        cmd,
-        args: args,
-        input: Process::Redirect::Close,
-        output: socket("stdout"),
-        error: socket("stderr")
-      )
-    end
-
-    def sh(cmd, args)
-      Process.run(
+      Process.new(
         cmd,
         args: args,
         input: Process::Redirect::Close,
         output: socket("stdout"),
         error: socket("stderr"),
-      ) { |p| yield(p) }
+      )
     end
 
     # Ensure we send logs at least every 10 seconds, even if the size is below 1MB
@@ -122,7 +115,7 @@ module BitteCI
 
       streams = [] of NamedTuple(stream: Hash(String, String), values: Array(Value))
       grouped.each do |labels, values|
-        streams << {stream: labels, values: values}
+        streams << {stream: labels, values: values.sort_by &.time}
       end
 
       uri = @loki_base_url.dup
@@ -138,6 +131,7 @@ module BitteCI
 
       case res.status
       when HTTP::Status::NO_CONTENT
+        Log.info &.emit("Loki#push", response: res.inspect)
       when HTTP::Status::IM_A_TEAPOT
         Log.info { "Kettle boiling over!" }
       else
@@ -148,6 +142,7 @@ module BitteCI
     end
 
     def log(text : String, labels : Hash(String, String))
+      # Log.info &.emit("loki#log", text: text)
       Log.info &.emit("loki#log", text: text, labels: labels)
       @inbox.send Value.new(Time.utc, text, labels)
     rescue e : Channel::ClosedError

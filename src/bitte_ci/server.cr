@@ -147,7 +147,6 @@ module BitteCI
       logs = Hash(UUID, Array(NamedTuple(time: Time, line: String))).new
 
       dec.data.result.each do |result|
-        next if result.stream["filename"] =~ /promtail\./
         id = UUID.new(result.stream["nomad_alloc_id"])
 
         current = logs[id]?
@@ -214,10 +213,8 @@ module BitteCI
       @[Option(secret: true, help: "Nomad token used for job submission")]
       property nomad_token : String
 
-      property runner_config : Runner::Config?
-
       def for_runner
-        @runner_config ||= Runner::Config.new({
+        Runner::Config.new({
           "github_user_content_base_url" => github_user_content_base_url.to_s,
         }, nil)
       end

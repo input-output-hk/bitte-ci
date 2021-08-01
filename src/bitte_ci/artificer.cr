@@ -69,7 +69,7 @@ module BitteCI
     end
 
     def self.upload(config, path)
-      uri = config.bitte_ci_base_url.dup
+      uri = config.public_url.dup
       uri.path = "/api/v1/output"
       uri.query = URI::Params.build { |form|
         form.add "nomad_alloc_id", config.nomad_alloc_id.to_s

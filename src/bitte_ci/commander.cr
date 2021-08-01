@@ -30,7 +30,7 @@ module BitteCI
       property name : String
 
       @[Option(help: "URL to reach the bitte-ci server for output uploads")]
-      property bitte_ci_base_url : URI
+      property public_url : URI
 
       @[Option(help: "outputs to upload")]
       property outputs : Array(String) = [] of String
@@ -53,7 +53,7 @@ module BitteCI
       property nomad_group_name : String
 
       @[Option(help: "Job's ID")]
-      property nomad_job_id : UUID
+      property nomad_job_id : String
 
       @[Option(help: "Job's name")]
       property nomad_job_name : String
@@ -67,14 +67,18 @@ module BitteCI
       @[Option(help: "Region in which the allocation is running")]
       property nomad_region : String
 
+      @[Option(help: "ID for identification in Loki")]
+      property bitte_ci_id : UUID
+
       def to_labels : Hash(String, String)
         {
+          "bitte_ci_id"         => bitte_ci_id.to_s,
           "nomad_alloc_id"      => nomad_alloc_id.to_s,
           "nomad_alloc_index"   => nomad_alloc_index.to_s,
           "nomad_alloc_name"    => nomad_alloc_name,
           "nomad_dc"            => nomad_dc,
           "nomad_group_name"    => nomad_group_name,
-          "nomad_job_id"        => nomad_job_id.to_s,
+          "nomad_job_id"        => nomad_job_id,
           "nomad_job_name"      => nomad_job_name,
           "nomad_job_parent_id" => nomad_job_parent_id.to_s,
           "nomad_namespace"     => nomad_namespace,
@@ -90,35 +94,33 @@ module BitteCI
     def initialize(@config : Config)
       @loki = Loki.new(@config.loki_base_url, @config.to_labels)
       @timeout = Channel(Signal).new
-      @exit_status = 1
+      @exited = Channel(Process::Status).new
+      @returned = Channel(Process::Status).new
     end
 
     def run
-      Log.info { "Starting Commander" }
+      Log.info { "Starting Commander with #{@config.inspect}" }
 
       pre_start
 
-      @loki.start do
-        start_timeout
+      status = @loki.start do
+        process = @loki.sh(@config.command, @config.args)
 
-        @loki.sh(@config.command, @config.args) do |process|
-          spawn do
-            while signal = @timeout.receive
-              Log.error { "timeout reached, sending SIG#{signal} to process" }
-              process.signal(signal)
-            end
-          end
+        start_forwarder(process)
+        start_wait(process)
+        start_timeout(@config.term_timeout, Signal::TERM)
+        start_timeout(@config.kill_timeout, Signal::KILL)
 
-          @exit_status = process.wait.exit_status
-
-          FileUtils.mkdir_p("/alloc/.bitte-ci")
-          File.touch(File.join("/alloc/.bitte-ci", @config.name))
-        end
+        @returned.receive
       end
 
-      post_start if @exit_status == 0
+      if status.normal_exit? && status.success?
+        FileUtils.mkdir_p("/alloc/.bitte-ci")
+        File.write(File.join("/alloc/.bitte-ci", @config.name), "ok")
+        post_start
+      end
 
-      exit @exit_status
+      exit status.exit_status
     end
 
     def pre_start
@@ -135,16 +137,31 @@ module BitteCI
       Artificer.run(@config)
     end
 
-    def start_timeout
+    def start_forwarder(process)
       spawn do
-        sleep @config.term_timeout
-        @timeout.send Signal::TERM
+        loop do
+          case res = Channel.receive_first(@exited, @timeout)
+          in Process::Status
+            @returned.send res
+            break
+          in Signal
+            process.signal(res)
+          end
+        end
       end
+    end
 
+    def start_wait(process)
       spawn do
-        sleep @config.kill_timeout
-        @timeout.send Signal::KILL
-        @timeout.close
+        @exited.send(process.wait)
+      end
+    end
+
+    def start_timeout(delay, signal)
+      spawn do
+        sleep delay
+        Log.error { "timeout #{delay}s reached, sending SIG#{signal} to process" }
+        @timeout.send signal
       end
     end
   end

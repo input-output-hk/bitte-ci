@@ -1,8 +1,8 @@
 { clang10Stdenv, linkFarm, lib, fetchFromGitHub, src, gmp, openssl, pkg-config
 , crystal, llvm_10, pcre, libevent, libyaml, zlib, file, libgit2, libssh2, bdwgc
-, removeReferencesTo, static ? false }:
+, static ? false }:
 let
-  pname = "bitte-ci";
+  pname = "bitte-ci-prepare";
   version = "0.1.0";
   name = "${pname}-${version}";
 
@@ -20,16 +20,15 @@ in clang10Stdenv.mkDerivation {
 
   buildInputs = [ gmp openssl pcre libevent libyaml zlib file libgit2 libssh2 ];
 
-  nativeBuildInputs = [ removeReferencesTo pkg-config crystal ];
+  nativeBuildInputs = [ pkg-config crystal ];
 
   buildPhase = ''
     ln -s ${crystalLib} lib
     mkdir -p $out/bin
-    crystal build ./src/bitte_ci.cr \
-      -o $out/bin/bitte-ci \
+    crystal build ./src/bitte_ci/preparator.cr \
+      -o $out/bin/bitte-ci-prepare \
       --link-flags "-L${bdwgc}/lib" \
       ${builtins.concatStringsSep " " crystalBuildFlags}
-    remove-references-to -t ${crystal} $out/bin/*
   '';
 
   installPhase = ":";

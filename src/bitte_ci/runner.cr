@@ -46,10 +46,11 @@ module BitteCI
       @[Option(help: "Specify a ci.cue file to use instad of fetching it from the base repo head")]
       property ci_cue : String?
 
-      property nomad_job_config : NomadJob::Config?
+      @[Option(help: "URL to reach the bitte-ci server for output uploads")]
+      property public_url : URI
 
       def for_nomad_job
-        @nomad_job_config ||= NomadJob::Config.new(
+        NomadJob::Config.new(
           nomad_datacenters: nomad_datacenters.dup,
           nomad_base_url: nomad_base_url.dup,
           nomad_ssl_ca: nomad_ssl_ca,
@@ -59,6 +60,7 @@ module BitteCI
           loki_base_url: loki_base_url,
           nomad_token: nomad_token,
           postgres_url: postgres_url,
+          public_url: public_url,
         )
       end
     end
@@ -145,38 +147,6 @@ module BitteCI
     end
   end
 
-  class GithubHook
-    include JSON::Serializable
-
-    property pull_request : PullRequest
-
-    class PullRequest
-      include JSON::Serializable
-
-      property id : UInt64
-      property number : UInt64
-      property base : Base
-      property head : Base
-      property statuses_url : String
-    end
-
-    class Base
-      include JSON::Serializable
-
-      property repo : Repo
-      property sha : String
-      property label : String
-      property ref : String
-    end
-
-    class Repo
-      include JSON::Serializable
-
-      property full_name : String
-      property clone_url : String
-    end
-  end
-
   class NomadJobPost
     include JSON::Serializable
 
@@ -205,7 +175,8 @@ module BitteCI
   class NomadJob
     struct Config
       getter nomad_datacenters, nomad_base_url, nomad_ssl_ca, nomad_ssl_cert,
-        nomad_ssl_key, runner_flake, loki_base_url, nomad_token, postgres_url
+        nomad_ssl_key, runner_flake, loki_base_url, nomad_token, postgres_url,
+        public_url
 
       def initialize(
         @nomad_datacenters : Array(String),
@@ -216,7 +187,8 @@ module BitteCI
         @runner_flake : URI,
         @loki_base_url : URI,
         @nomad_token : String,
-        @postgres_url : URI
+        @postgres_url : URI,
+        @public_url : URI
       )
       end
     end
@@ -233,7 +205,7 @@ module BitteCI
     def queue!
       post = post_job!
 
-      Log.info { post.inspect }
+      Log.debug &.emit("NomadJob#queue!", post: post.inspect)
 
       DB.open(@config.postgres_url) do |db|
         db.transaction do
@@ -342,7 +314,7 @@ module BitteCI
     def tasks
       default = @job_config.ci.steps
       prepare_config.merge(default).map do |name, step_config|
-        Task.new(@pr, name, step_config, @config.runner_flake, @config.loki_base_url)
+        Task.new(@pr, name, step_config, @config, @loki_id)
       end
     end
 
@@ -351,14 +323,14 @@ module BitteCI
         @pr : GithubHook::PullRequest,
         @name : String,
         @config : JobConfig::Step,
-        @runner_flake : URI,
-        @loki_base_url : URI
+        @job_config : Config,
+        @loki_id : UUID
       )
       end
 
       # combine the required dependencies for the runner.sh with
       def dependencies
-        deps = %w[bashInteractive coreutils cacert gnugrep git bitte-ci-static].map { |a| "#{@runner_flake}##{a}" }
+        deps = %w[cacert bitte-ci].map { |a| "#{@job_config.runner_flake}##{a}" }
         original = @config.flakes.flat_map { |k, vs| vs.map { |v| "#{k}##{v}" } }
         (deps + original).uniq
       end
@@ -379,8 +351,11 @@ module BitteCI
               "--name", @name,
               "--command", command[0],
               "--args", args.to_json,
-              "--loki-base-url", @loki_base_url.to_s,
+              "--loki-base-url", @job_config.loki_base_url.to_s,
+              "--public-url", @job_config.public_url.to_s,
               "--after", @config.after.to_json,
+              "--outputs", @config.outputs.to_json,
+              "--bitte-ci-id", @loki_id,
             ],
           },
 
@@ -437,7 +412,10 @@ module BitteCI
       {
         "prepare" => JobConfig::Step.new(
           label: "Git checkout to /alloc/repo",
-          command: ["/bin/bitte-ci", "prepare"],
+          command: [
+            "bitte-ci", "prepare",
+            "--public-url", @config.public_url.to_s,
+          ],
           enable: true,
           vault: false,
           cpu: 3000u32,

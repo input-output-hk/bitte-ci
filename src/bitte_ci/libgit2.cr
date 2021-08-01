@@ -252,31 +252,41 @@ lib LibGit
 
   fun git_checkout_options_init(out : CheckoutOptions*, version : LibC::UInt) : LibC::Int
   fun git_checkout_tree(repo : Repository, treeish : Object, opts : CheckoutOptions*) : LibC::Int
+
   fun git_clone_options_init(out : CloneOptions*, version : LibC::UInt) : LibC::Int
   fun git_clone(out : Repository*, url : LibC::Char*, local_path : LibC::Char*, git_clone_options : CloneOptions*) : LibC::Int
+
   fun git_commit_lookup(out : Commit*, repo : Repository, oid : OID*) : LibC::Int
+
   fun git_libgit2_init : LibC::Int
+
   fun git_object_lookup(out : Object*, repo : Repository, oid : OID*, type : OBJECT) : LibC::Int
 
-  fun git_oid_fromstrn(out : OID*, str : LibC::Char*, len : LibC::SizeT) : LibC::Int
-  fun git_oid_tostr_s(oid : OID*) : LibC::Char*
-  fun git_oid_fromstr(out : OID*, str : LibC::Char*) : LibC::Int
   fun git_oid_fmt(str : UInt8*, oid : OID*) : LibC::Int
+  fun git_oid_fromstrn(out : OID*, str : LibC::Char*, len : LibC::SizeT) : LibC::Int
+  fun git_oid_fromstr(out : OID*, str : LibC::Char*) : LibC::Int
+  fun git_oid_tostr_s(oid : OID*) : LibC::Char*
 
+  fun git_repository_head(out : Reference*, repo : Repository) : LibC::Int
   fun git_repository_init(out : Repository*, path : LibC::Char*, is_bare : LibC::UInt) : LibC::Int
   fun git_repository_open(out : Repository*, path : LibC::Char*) : LibC::Int
-  fun git_repository_head(out : Reference*, repo : Repository) : LibC::Int
+
   fun git_reset(repo : Repository, target : Object, reset_type : RESET, checkout_opts : CheckoutOptions*) : LibC::Int
 end
 
 module Git
-  def self.repository_open(path)
+  def self.init
+    LibGit.git_libgit2_init
+  end
+
+  def self.repository_open(path) : LibGit::Repository
     check(LibGit.git_repository_open(out repo, path))
     repo
   end
 
-  def self.clone(url, path)
+  def self.clone(url, path) : LibGit::Repository
     check(LibGit.git_clone(out repo, url, path, nil))
+    repo
   end
 
   def self.checkout(repo, sha1)
