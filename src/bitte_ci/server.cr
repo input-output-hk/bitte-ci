@@ -147,6 +147,7 @@ module BitteCI
       logs = Hash(UUID, Array(NamedTuple(time: Time, line: String))).new
 
       dec.data.result.each do |result|
+        Log.info { result.inspect }
         id = UUID.new(result.stream["nomad_alloc_id"])
 
         current = logs[id]?

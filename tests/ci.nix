@@ -106,7 +106,8 @@ let
     echo '{"channel":"build"}' \
       | jq -c --arg uuid "$uuid" '.uuid = $uuid' \
       | websocat -B 1000000 ws://0.0.0.0:9494/ci/api/v1/socket \
-      | jq -e '.value.logs[][-1].line == "hello, world"'
+      | jq -e -r '.value.logs[][].line' \
+      | grep goodbye
 
     echo '{"channel":"allocation"}' \
       | jq -c --arg uuid "$(echo "$job" | awk '/ID/ { print $3; exit }')" '.uuid = $uuid' \
@@ -160,10 +161,15 @@ let
 
     ci: steps: {
       hello: {
-        label: "hello"
         command: ["bash", "-c", "hello -t > /alloc/hello; hello -t"]
         flakes: "git://127.0.0.1:7070/": ["bash", "hello"]
         outputs: ["/alloc/hello"]
+      },
+      bye: {
+        after: ["hello"]
+        command: ["bash", "-c", "hello -g goodbye > /local/bye; hello -g goodbye"]
+        flakes: "git://127.0.0.1:7070/": ["bash", "hello"]
+        outputs: ["/local/bye"]
       }
     }
   '';
@@ -237,8 +243,6 @@ in pkgs.nixosTest {
       ];
 
       nix = {
-        package = pkgs.nixFlakes;
-
         # registry.nixpkgs.flake = inputs.nixpkgs;
         # registry.crystal-src.flake = inputs.crystal-src;
 
@@ -317,7 +321,7 @@ in pkgs.nixosTest {
         nomad = {
           enable = true;
           enableDocker = false;
-          extraPackages = with pkgs; [ nixFlakes git ];
+          extraPackages = with pkgs; [ nix git ];
 
           # required for exec driver
           dropPrivileges = false;
@@ -393,7 +397,6 @@ in pkgs.nixosTest {
 
     ci.wait_for_unit("git-daemon")
 
-    # wait for webfs to respond
     ci.wait_for_unit("fake-github")
     ci.wait_for_open_port(9090)
 

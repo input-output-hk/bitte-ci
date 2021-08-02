@@ -7,6 +7,9 @@
     arion.url = "github:hercules-ci/arion";
     bitte-ci-frontend.url = "github:input-output-hk/bitte-ci-frontend";
 
+    # requires this PR https://github.com/NixOS/nix/pull/5082
+    nix.url = "github:NixOS/nix";
+
     crystal-src = {
       url =
         "https://github.com/crystal-lang/crystal/releases/download/1.1.1/crystal-1.1.1-1-linux-x86_64.tar.gz";
@@ -38,6 +41,8 @@
             ".fixture"
           ];
         in {
+          nix = inputs.nix.packages.${prev.system}.nix;
+
           nomad = inputs.bitte.legacyPackages.${prev.system}.nomad;
 
           http-parser-static = prev.callPackage ./pkgs/http-parser { };

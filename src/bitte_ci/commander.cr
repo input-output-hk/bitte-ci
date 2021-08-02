@@ -72,6 +72,7 @@ module BitteCI
 
       def to_labels : Hash(String, String)
         {
+          "bitte_ci_step"       => name,
           "bitte_ci_id"         => bitte_ci_id.to_s,
           "nomad_alloc_id"      => nomad_alloc_id.to_s,
           "nomad_alloc_index"   => nomad_alloc_index.to_s,
