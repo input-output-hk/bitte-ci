@@ -97,9 +97,7 @@
 
       legacyPackages.x86_64-linux = pkgs;
 
-      packages.x86_64-linux.bitte-ci = pkgs.bitte-ci;
-      packages.x86_64-linux.bitte-ci-prepare = pkgs.bitte-ci-prepare;
-      packages.x86_64-linux.bitte-ci-static = pkgs.bitte-ci-static;
+      packages.x86_64-linux = { inherit (pkgs) bitte-ci bitte-ci-static; };
 
       defaultPackage.x86_64-linux = self.packages.x86_64-linux.bitte-ci;
 
