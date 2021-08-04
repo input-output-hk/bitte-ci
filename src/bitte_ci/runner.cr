@@ -1,9 +1,11 @@
 require "json"
 require "yaml"
 require "http/client"
+require "pg"
 require "./uuid"
 require "./job_config"
 require "./simple_config"
+require "./github_hook"
 
 Second = 1_000_000_000u64
 Minute = Second * 60
@@ -412,10 +414,7 @@ module BitteCI
       {
         "prepare" => JobConfig::Step.new(
           label: "Git checkout to /alloc/repo",
-          command: [
-            "bitte-ci", "prepare",
-            "--public-url", @config.public_url.to_s,
-          ],
+          command: ["bitte-ci", "prepare"],
           enable: true,
           vault: false,
           cpu: 3000u32,

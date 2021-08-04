@@ -1,0 +1,45 @@
+<div>
+  <div>
+    <a href="/pull_request/<%= build.pr_id %>">
+      Back to Pull Request
+    </a>
+  </div>
+
+  <hr/>
+
+  <h3>Allocations</h3>
+
+  <% a = alloc.parsed.allocation %>
+  <div>Description: <%= h a.client_description %></div>
+  <div>Client Status: <%= h a.client_status %></div>
+  <div>Created: <%= a.create_time %></div>
+  <% a.task_states.try &.each do |name, state| %>
+    <% if state.events.any?{|event| event.details["fails_task"]? } %>
+      <h4><%= h name %></h4>
+      <div>State: <%= h state.state %></div>
+      <div>Finished at: <%= state.finished_at %></div>
+      <pre>
+<%- state.events.each do |event| -%>
+<%- if event.details.empty? -%>
+<%= h event.display_message %>
+<%- else -%>
+<%= h event.display_message %> <%= h event.details.pretty_inspect %>
+<%- end -%>
+<%- end -%>
+      </pre>
+    <% end %>
+  <% end %>
+
+  <h3>Logs</h3>
+
+  <% logs.each do |alloc_id, steps| %>
+    <h2><%= alloc_id %></h2>
+    <% steps.each do |step_name, step | %>
+      <h3><%= step_name %></h3>
+<pre>
+<% step.each do |step| %><%= step[:time] %> <%= step[:line] %>
+<% end %>
+</pre>
+    <% end %>
+  <% end %>
+</div>

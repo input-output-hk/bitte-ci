@@ -3,6 +3,8 @@ require "json"
 require "db"
 require "pg"
 require "./uuid"
+require "./simple_config"
+require "./line"
 
 module BitteCI
   module Listener
@@ -66,7 +68,6 @@ module BitteCI
       j = Line.from_json(line)
       j.events.each do |event|
         next unless event.is_a?(Allocation)
-        pp! event
 
         db.transaction do
           id = event.payload.allocation.id
@@ -75,11 +76,11 @@ module BitteCI
 
           Log.info { "Updating allocation #{id} with #{status}" }
 
-          db.exec <<-SQL, id, eval_id, j.index, status
+          db.exec <<-SQL, id, eval_id, j.index, status, event.payload.to_json
             INSERT INTO allocations
-              (id, eval_id, index, client_status, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())
+              (id, eval_id, index, client_status, data, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
             ON CONFLICT (id) DO
-              UPDATE SET index = $3, updated_at = NOW(), client_status = $4;
+              UPDATE SET index = $3, updated_at = NOW(), client_status = $4, data = $5;
           SQL
 
           db.exec "SELECT pg_notify($1, $2)", "allocations", id
@@ -103,8 +104,8 @@ module BitteCI
         end
       end
     rescue e : JSON::ParseException
-      Log.error { "Couldn't parse line" }
-      Log.error { line }
+      Log.error &.emit("Couldn't parse line, stored as line.json", error: e.inspect)
+      File.write("line.json", line)
     end
 
     def self.ssl_context(config)
@@ -113,58 +114,6 @@ module BitteCI
         "cert" => config.nomad_ssl_cert,
         "key"  => config.nomad_ssl_key,
       })
-    end
-
-    class Line
-      include JSON::Serializable
-
-      @[JSON::Field(key: "Index")]
-      property index : UInt64
-
-      @[JSON::Field(key: "Events")]
-      property events : Array(Event)
-    end
-
-    abstract class Event
-      include JSON::Serializable
-
-      use_json_discriminator "Topic", {
-        Allocation: Allocation,
-      }
-
-      @[JSON::Field(key: "Topic")]
-      property topic : String
-
-      @[JSON::Field(key: "Namespace")]
-      property namespace : String
-    end
-
-    class Allocation < Event
-      @[JSON::Field(key: "Payload")]
-      property payload : AllocationPayload
-    end
-
-    class AllocationPayload
-      include JSON::Serializable
-
-      @[JSON::Field(key: "Allocation")]
-      property allocation : AllocationPayloadAllocation
-    end
-
-    class AllocationPayloadAllocation
-      include JSON::Serializable
-
-      @[JSON::Field(key: "ClientStatus")]
-      property client_status : String
-
-      @[JSON::Field(key: "TaskGroup")]
-      property task_group : String
-
-      @[JSON::Field(key: "ID")]
-      property id : UUID
-
-      @[JSON::Field(key: "EvalID")]
-      property eval_id : UUID
     end
   end
 end

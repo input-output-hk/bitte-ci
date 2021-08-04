@@ -1,6 +1,7 @@
 require "http/client"
 require "log"
 require "uri"
+require "./time"
 
 module BitteCI
   class Loki
@@ -12,7 +13,7 @@ module BitteCI
       def initialize(@time, @text, @labels); end
 
       def to_json(b)
-        [((1000000000u128 * @time.to_unix) + @time.nanosecond).to_s, @text].to_json(b)
+        [@time.to_unix_ns.to_s, @text].to_json(b)
       end
     end
 
@@ -147,6 +148,51 @@ module BitteCI
       @inbox.send Value.new(Time.utc, text, labels)
     rescue e : Channel::ClosedError
       Log.error &.emit("Loki#log", error: e.to_s) unless @stopping
+    end
+
+    def self.query_range(loki_base_url, loki_id, from, to)
+      query = URI::Params.new(
+        {
+          "direction" => ["FORWARD"],
+          "query"     => [%({bitte_ci_id="#{loki_id}"})],
+          "start"     => [(from.to_unix_ms * 1000000).to_s],
+          "end"       => [((to || Time.utc).to_unix_ms * 1000000).to_s],
+        }
+      )
+
+      url = loki_base_url.dup
+      url.path = "/loki/api/v1/query_range"
+      url.query = query.to_s
+
+      Log.info { "querying #{url}" }
+
+      res = HTTP::Client.get(url)
+
+      range = LokiQueryRange.from_json(res.body)
+
+      logs = Hash(UUID, Hash(String, Array(NamedTuple(time: Time, line: String)))).new
+
+      range.data.result.each do |result|
+        Log.info { result.inspect }
+        alloc_id = UUID.new(result.stream["nomad_alloc_id"])
+        step_name = result.stream["bitte_ci_step"]
+
+        alloc = logs[alloc_id]?
+        alloc ||= Hash(String, Array(NamedTuple(time: Time, line: String))).new
+
+        step = alloc[step_name]?
+        step ||= Array(NamedTuple(time: Time, line: String)).new
+
+        result.values.each do |line|
+          time, text = line[0], line[1]
+          step << {time: Time.unix_ms((time.to_i64 / 1000000).to_i64), line: text}
+        end
+
+        alloc[step_name] = step
+        logs[alloc_id] = alloc
+      end
+
+      logs
     end
   end
 end

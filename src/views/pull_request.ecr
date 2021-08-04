@@ -1,0 +1,81 @@
+<div>
+  <div class="row">
+    <h3 class="col">
+      <%= pr.title %>
+    </h3>
+  </div>
+
+  <div class="row mt-5 mb-5">
+    <div class="col col-sm-6">
+      Commit: <%= pr.sha %>
+
+      <a href="<%= pr.commit_url %>">
+        <i class="bi bi-box-arrow-up-right"></i>
+      </a>
+    </div>
+
+    <div class="col col-sm-3">
+      Pull Request: <%= pr.number %>
+
+      <a href="<%= pr.url %>">
+        <i class="bi bi-box-arrow-up-right"></i>
+      </a>
+    </div>
+
+    <div class="col col-sm-3">
+      Branch: <%= pr.ref %>
+
+      <a href="<%= pr.branch_url %>">
+        <i class="bi bi-box-arrow-up-right"></i>
+      </a>
+    </div>
+
+    <div class="col col-sm-2">
+      User: <%= pr.user_login %>
+
+      <a href="<%= pr.user_url %>">
+        <i class="bi bi-box-arrow-up-right"></i>
+      </a>
+    </div>
+  </div>
+
+  <table class="table table-md">
+    <thead>
+      <tr>
+        <th>Build</th>
+        <th>Created</th>
+        <th>Updated</th>
+        <th>Finished</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <% pr.builds.order_by(:created_at, :desc).each do |build| %>
+        <tr>
+          <td>
+            <a href="<%= build.url %>">
+              <%= build.id.to_s.split("-").first %>
+            </a>
+          </td>
+
+          <td>
+            <%= build.created_at %>
+          </td>
+
+          <td>
+            <%= build.updated_at %>
+          </td>
+
+          <td>
+            <%= build.finished_at %>
+          </td>
+
+          <td>
+            <%= build.build_status.to_s %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

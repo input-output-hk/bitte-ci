@@ -1,5 +1,6 @@
 require "clear"
 require "./uuid"
+require "./line"
 
 Clear.enum BuildStatus, "pending", "running", "complete", "failed"
 
@@ -11,9 +12,103 @@ class PullRequest
 
   has_many builds : Build, foreign_key: "pr_id"
 
+  def job_id
+    "#{base["repo"]["full_name"]}##{number}-#{sha}"
+  end
+
   # TODO: whittle down the data we actually want to send
   def simplify
     {id: id, data: data, builds: builds.order_by(:created_at, :desc).map(&.simplify)}
+  end
+
+  def pull_request
+    data.dig("pull_request")
+  end
+
+  def base
+    data.dig("pull_request", "base")
+  end
+
+  def head
+    data.dig("pull_request", "head")
+  end
+
+  def ref
+    data.dig("pull_request", "head", "ref").as_s
+  end
+
+  def head_repo_url
+    data.dig("pull_request", "head", "repo", "html_url").as_s
+  end
+
+  def sha
+    data.dig("pull_request", "head", "sha").as_s
+  end
+
+  def title
+    data.dig("pull_request", "title").as_s
+  end
+
+  def user_login
+    data.dig("pull_request", "user", "login").as_s
+  end
+
+  def user_url
+    data.dig("pull_request", "user", "html_url").as_s
+  end
+
+  def base_url
+    data.dig("pull_request", "base", "repo", "html_url").as_s
+  end
+
+  def base_name
+    data.dig("pull_request", "base", "repo", "name").as_s
+  end
+
+  def number
+    data.dig("pull_request", "number").as_i64
+  end
+
+  def org_avatar
+    data.dig("organization", "avatar_url").as_s
+  end
+
+  def url
+    data.dig("pull_request", "html_url").as_s
+  end
+
+  def created_at
+    Time.parse_rfc3339(data.dig("pull_request", "created_at").as_s)
+  end
+
+  def created_at_relative
+    span = Time.utc - created_at
+
+    if span.total_days > 1
+      "#{span.total_days.round(1)} days ago"
+    elsif span.total_hours > 1
+      "#{span.total_hours.round(1)} hours ago"
+    elsif span.total_minutes > 1
+      "#{span.total_minutes.round(1)} minutes ago"
+    else
+      "#{span.total_seconds.round(1)} seconds ago"
+    end
+  end
+
+  def branch_url
+    "#{head_repo_url}/tree/#{ref}"
+  end
+
+  def org_url
+    "https://github.com/#{data["organization"]["login"]}"
+  end
+
+  def commit_url
+    "#{head_repo_url}/commits/#{sha}"
+  end
+
+  def sha_short
+    sha[0..7]
   end
 end
 
@@ -49,6 +144,10 @@ class Build
     when BuildStatus::Failed
       "failure"
     end
+  end
+
+  def url
+    "/build/#{id}"
   end
 
   def statuses_url
@@ -104,8 +203,14 @@ class Allocation
   column client_status : String
   column index : Int64
   column eval_id : UUID
+  column data : JSON::Any
 
   has_many outputs : Output, foreign_key: "alloc_id"
+
+  # TODO: Optimize this (see https://github.com/anykeyh/clear/issues/95 )!
+  def parsed
+    ::BitteCI::Listener::AllocationPayload.from_json(data.to_json)
+  end
 
   def simplify
     outputs = Output.query.where { alloc_id == id }.select(:id, :size, :created_at, :alloc_id, :path, :mime).to_a

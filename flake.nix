@@ -35,6 +35,7 @@
         let
           src = prev.lib.sourceFilesBySuffices ./. [
             ".cr"
+            ".ecr"
             ".lock"
             ".yml"
             ".cue"

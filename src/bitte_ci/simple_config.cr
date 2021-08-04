@@ -151,6 +151,14 @@ class URI
 end
 
 class String
+  def to_simple_option(k : Int32.class)
+    to_i32
+  end
+
+  def to_simple_option(k : UInt32.class)
+    to_u32
+  end
+
   def to_simple_option(k : Int64.class)
     to_i64
   end

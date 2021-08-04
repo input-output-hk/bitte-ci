@@ -1,6 +1,7 @@
-require "./simple_config"
 require "digest"
 require "file_utils"
+require "./simple_config"
+require "./magic"
 
 module BitteCI
   class Artificer

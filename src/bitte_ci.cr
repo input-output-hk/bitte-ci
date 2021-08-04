@@ -90,6 +90,7 @@ module BitteCI
 
     case action
     in BitteCI::Cmd::Serve
+      ::Log.builder.bind "clear.*", Log::Severity::Debug, Log::IOBackend.new
       Log.info { "Starting server" }
       server_config = BitteCI::Server::Config.new(flags, config_file)
       Clear::SQL.init(server_config.postgres_url.to_s)

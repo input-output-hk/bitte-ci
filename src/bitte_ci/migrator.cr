@@ -1,3 +1,5 @@
+require "clear"
+require "./model"
 require "./simple_config"
 
 module BitteCI
@@ -82,5 +84,13 @@ class Migration3
   def change(direction)
     drop_column "outputs", "data", "bytea"
     add_column "outputs", "sha256", "text", nullable: false
+  end
+end
+
+class Migration4
+  include Clear::Migration
+
+  def change(direction)
+    add_column "allocations", "data", "jsonb"
   end
 end

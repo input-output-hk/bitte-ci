@@ -1,4 +1,8 @@
 require "socket"
+require "./uuid"
+require "./loki"
+require "file_utils"
+require "./artificer"
 
 module BitteCI
   class Commander

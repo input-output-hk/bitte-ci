@@ -82,6 +82,13 @@ lib LibGit
   type Object = Void*
   type Reference = Void*
 
+  struct Refspec
+    string : LibC::Char*
+    src : LibC::Char*
+    dst : LibC::Char*
+    force : LibC::UInt
+  end
+
   struct DiffFile
     id : OID
     path : LibC::Char*
@@ -247,14 +254,18 @@ lib LibGit
   fun git_error_last : GitError*
   fun git_error_clear
 
-  # fun remote_create = git_remote_create(out : Remote*, repo : Repository, name : LibC::Char*, url : LibC::Char*) : LibC::Int
-  # fun remote_fetch = git_remote_fetch(remote : *Remote, refspecs : Strarray*, const git_fetch_options *opts, reflog_message : LibC::Char*): int
+  fun git_remote_create(out : Remote*, repo : Repository, name : LibC::Char*, url : LibC::Char*) : LibC::Int
+  fun git_remote_fetch(remote : Remote, refspecs : Strarray*, opts : FetchOptions*, reflog_message : LibC::Char*) : LibC::Int
+  fun git_remote_list(out : Strarray*, repo : Repository) : LibC::Int
+  fun git_remote_lookup(out : Remote*, repo : Repository, name : LibC::Char*) : LibC::Int
 
   fun git_checkout_options_init(out : CheckoutOptions*, version : LibC::UInt) : LibC::Int
   fun git_checkout_tree(repo : Repository, treeish : Object, opts : CheckoutOptions*) : LibC::Int
 
   fun git_clone_options_init(out : CloneOptions*, version : LibC::UInt) : LibC::Int
   fun git_clone(out : Repository*, url : LibC::Char*, local_path : LibC::Char*, git_clone_options : CloneOptions*) : LibC::Int
+
+  fun git_refspec_parse(out : Refspec**, input : LibC::Char*, is_fetch : LibC::Int) : LibC::Int
 
   fun git_commit_lookup(out : Commit*, repo : Repository, oid : OID*) : LibC::Int
 
@@ -275,29 +286,67 @@ lib LibGit
 end
 
 module Git
+  module Helper
+    def check(res)
+      return if res == 0
+      e = LibGit.git_error_last
+      if e.null?
+        raise "LibGit error without message: #{res.inspect} (#{LibGit::Error.new(res)}"
+      else
+        raise String.new(e.value.message)
+      end
+    end
+  end
+
+  extend Helper
+
   def self.init
     LibGit.git_libgit2_init
   end
 
-  def self.repository_open(path) : LibGit::Repository
-    check(LibGit.git_repository_open(out repo, path))
-    repo
+  class Repository
+    include Helper
+    @repo : LibGit::Repository
+
+    def initialize(path, bare)
+      @repo = check(LibGit.git_repository_init(out repo, path, bare ? 1 : 0))
+    end
+
+    def initialize(repo)
+      @repo = repo
+    end
+
+    def self.init(path, bare) : self
+      check(LibGit.git_repository_init(out repo, path, bare ? 1 : 0))
+      new(repo)
+    end
+
+    def self.open(path) : self
+      check(LibGit.git_repository_open(out repo, path))
+      new(repo)
+    end
+
+    def reset(rev)
+      obj = object_lookup(rev)
+      checkout_options = Git.checkout_options_init
+      check(LibGit.git_reset(@repo, obj, LibGit::RESET::HARD, pointerof(checkout_options)))
+    end
+
+    def object_lookup(rev)
+      check(LibGit.git_oid_fromstr(out oid, rev))
+      check(LibGit.git_object_lookup(out obj, @repo, pointerof(oid), LibGit::OBJECT::ANY))
+      obj
+    end
   end
 
-  def self.clone(url, path) : LibGit::Repository
+  def self.clone(url, path) : Repository
     check(LibGit.git_clone(out repo, url, path, nil))
-    repo
+    Repository.new(repo)
   end
 
   def self.checkout(repo, sha1)
     checkout_options = checkout_options_init
     check(LibGit.git_checkout_tree(repo, obj, pointerof(checkout_options)))
-  end
-
-  def self.reset(repo, sha1)
-    obj = object_lookup(repo, sha1)
-    checkout_options = checkout_options_init
-    check(LibGit.git_reset(repo, obj, LibGit::RESET::HARD, pointerof(checkout_options)))
   end
 
   def self.checkout_options_init
@@ -312,13 +361,30 @@ module Git
     obj
   end
 
-  def self.check(res)
-    return if res == 0
-    e = LibGit.git_error_last
-    if e.null?
-      raise String.new(e.value.message)
-    else
-      raise "LibGit error without message: #{res.inspect}"
-    end
+  def self.remote_create(repo, name, url)
+    check(LibGit.git_remote_create(out remote, repo, name, url))
+    remote
+  end
+
+  def self.remote_fetch(remote, refspecs)
+    specs = LibGit::Strarray.new
+    specs.strings = refspecs.map(&.to_unsafe).to_unsafe
+    specs.count = refspecs.size
+    check(LibGit.git_remote_fetch(remote, pointerof(specs), nil, nil))
+  end
+
+  def self.remote_list(repo)
+    check(LibGit.git_remote_list(out list, repo))
+    list
+  end
+
+  def self.remote_lookup(repo, name)
+    check(LibGit.git_remote_lookup(out remote, repo, name))
+    remote
+  end
+
+  def self.refspec_parse(input, fetch)
+    check(LibGit.git_refspec_parse(out refspec, input, fetch ? 1 : 0))
+    refspec
   end
 end
