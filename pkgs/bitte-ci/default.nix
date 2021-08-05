@@ -1,36 +1,32 @@
-{ clang10Stdenv, linkFarm, lib, fetchFromGitHub, src, gmp, openssl, pkg-config
-, crystal, llvm_10, pcre, libevent, libyaml, zlib, file, libgit2, libssh2, bdwgc
-, removeReferencesTo, static ? false }:
+{ lib, callPackage, pkgsStatic, pkgsMusl }:
 let
-  pname = "bitte-ci";
-  version = "0.1.0";
-  name = "${pname}-${version}";
+  cmds = [ "bitte-ci" "command" "listen" "migrate" "prepare" "queue" "server" ];
 
-  crystalLib = linkFarm "crystal-lib" (lib.mapAttrsToList (name: value: {
-    inherit name;
-    path = fetchFromGitHub value;
-  }) (import ../../shards.nix));
+  mkBitte = name: main:
+    callPackage ./package.nix {
+      extraArgs = { inherit main name bitteCiPackages; };
+    };
 
-  crystalBuildFlags = if static then [ "--static" "--release" ] else [ ];
-in clang10Stdenv.mkDerivation {
-  inherit pname version;
-  inherit src;
+  mkBitteStatic = name: main:
+    callPackage ./package.nix {
+      inherit (pkgsMusl) clang10Stdenv llvm_10;
+      inherit (pkgsStatic)
+        gmp openssl pcre libevent libyaml zlib file libgit2 libssh2 bdwgc;
+      extraArgs = {
+        inherit main name bitteCiPackages;
+        static = true;
+      };
+    };
 
-  LLVM_CONFIG = "${llvm_10}/bin/llvm-config";
-
-  buildInputs = [ gmp openssl pcre libevent libyaml zlib file libgit2 libssh2 ];
-
-  nativeBuildInputs = [ removeReferencesTo pkg-config crystal ];
-
-  buildPhase = ''
-    ln -s ${crystalLib} lib
-    mkdir -p $out/bin
-    crystal build ./src/bitte_ci.cr \
-      -o $out/bin/bitte-ci \
-      --link-flags "-L${bdwgc}/lib" \
-      ${builtins.concatStringsSep " " crystalBuildFlags}
-    remove-references-to -t ${crystal} $out/bin/*
-  '';
-
-  installPhase = ":";
-}
+  bitteCiPackages = with builtins;
+    listToAttrs (concatLists (map (name: [
+      {
+        name = "${name}-static";
+        value = mkBitteStatic name "src/bitte_ci/cli/${name}.cr";
+      }
+      {
+        inherit name;
+        value = mkBitte name "src/bitte_ci/cli/${name}.cr";
+      }
+    ]) cmds));
+in callPackage ./package.nix { extraArgs = { inherit bitteCiPackages; }; }

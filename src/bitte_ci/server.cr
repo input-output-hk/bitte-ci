@@ -143,18 +143,21 @@ module BitteCI
         )
 
         pr = build.pull_request
-        alloc = Allocation.query
+        allocs = Allocation.query
           .where { data.jsonb("Allocation.JobID") == pr.job_id }
           .to_a
           .select { |alloc|
-            alloc.parsed.allocation.task_states.try &.any? { |n, state|
+            parsed = alloc.parsed
+            newer = parsed.allocation.create_time >= build.created_at
+            newer && alloc.parsed.allocation.task_states.try &.any? { |n, state|
               state.events.any? { |event|
                 event.details["fails_task"]?
               }
             }
           }
           .sort_by { |alloc| alloc.created_at }
-          .last
+
+        alloc = allocs.last?
 
         render "src/views/build.ecr", "src/views/layout.ecr"
       end

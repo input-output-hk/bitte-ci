@@ -1,0 +1,10 @@
+[
+  ../../src/bitte_ci/cli.cr
+  ../../src/bitte_ci/cli/prepare.cr
+  ../../src/bitte_ci/libgit2.cr
+  ../../src/bitte_ci/loki.cr
+  ../../src/bitte_ci/preparator.cr
+  ../../src/bitte_ci/simple_config.cr
+  ../../src/bitte_ci/time.cr
+  ../../src/bitte_ci/uuid.cr
+]

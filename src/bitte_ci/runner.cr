@@ -291,7 +291,7 @@ module BitteCI
         Datacenters: @config.nomad_datacenters,
         TaskGroups:  [
           {
-            Name:             task_group_name,
+            Name:             "steps",
             Count:            1,
             Tasks:            tasks,
             ReschedulePolicy: {
@@ -332,7 +332,7 @@ module BitteCI
 
       # combine the required dependencies for the runner.sh with
       def dependencies
-        deps = %w[cacert bitte-ci].map { |a| "#{@job_config.runner_flake}##{a}" }
+        deps = %w[cacert bitte-ci.command].map { |a| "#{@job_config.runner_flake}##{a}" }
         original = @config.flakes.flat_map { |k, vs| vs.map { |v| "#{k}##{v}" } }
         (deps + original).uniq
       end
@@ -347,9 +347,8 @@ module BitteCI
 
           Config: {
             flake_deps: dependencies,
-            command:    "/bin/bitte-ci",
+            command:    "/bin/bitte-ci-command",
             args:       [
-              "command",
               "--name", @name,
               "--command", command[0],
               "--args", args.to_json,
@@ -366,6 +365,7 @@ module BitteCI
             "SSL_CERT_FILE" => "/current-alloc/etc/ssl/certs/ca-bundle.crt",
             "SHA"           => @pr.head.sha,
             "CLONE_URL"     => @pr.head.repo.clone_url,
+            "PR_NUMBER"     => @pr.number.to_s,
             "LABEL"         => @pr.head.label,
             "REF"           => @pr.head.ref,
             "FULL_NAME"     => @pr.base.repo.full_name,
@@ -402,6 +402,9 @@ module BitteCI
               Policies:   ["nomad-cluster"],
             }
           end,
+
+          Lifecycle: {Hook: @config.lifecycle},
+          Sidecar:   @config.sidecar,
         }
       end
 
@@ -414,7 +417,8 @@ module BitteCI
       {
         "prepare" => JobConfig::Step.new(
           label: "Git checkout to /alloc/repo",
-          command: ["bitte-ci", "prepare"],
+          flakes: {@config.runner_flake.to_s => ["bitte-ci.prepare"]},
+          command: ["bitte-ci-prepare"],
           enable: true,
           vault: false,
           cpu: 3000u32,

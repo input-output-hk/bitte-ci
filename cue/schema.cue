@@ -16,7 +16,7 @@ import ("list")
 	enable:  *true | false
 	vault:   *false | true
 	cpu:     *100 | uint & >=100
-	memory:  *32 | uint & >=32
+	memory:  *40 | uint & >=64
 	outputs: [...#types.output] | *[]
 	env: [string]: string
 	term_timeout: *1800 | int & >60

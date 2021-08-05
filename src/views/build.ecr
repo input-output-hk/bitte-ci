@@ -7,18 +7,19 @@
 
   <hr/>
 
-  <h3>Allocations</h3>
+  <% if alloc %>
+    <h3>Allocations</h3>
 
-  <% a = alloc.parsed.allocation %>
-  <div>Description: <%= h a.client_description %></div>
-  <div>Client Status: <%= h a.client_status %></div>
-  <div>Created: <%= a.create_time %></div>
-  <% a.task_states.try &.each do |name, state| %>
-    <% if state.events.any?{|event| event.details["fails_task"]? } %>
-      <h4><%= h name %></h4>
-      <div>State: <%= h state.state %></div>
-      <div>Finished at: <%= state.finished_at %></div>
-      <pre>
+    <% a = alloc.parsed.allocation %>
+    <div>Description: <%= h a.client_description %></div>
+    <div>Client Status: <%= h a.client_status %></div>
+    <div>Created: <%= a.create_time %></div>
+    <% a.task_states.try &.each do |name, state| %>
+      <% if state.events.any?{|event| event.details["fails_task"]? } %>
+        <h4><%= h name %></h4>
+        <div>State: <%= h state.state %></div>
+        <div>Finished at: <%= state.finished_at %></div>
+        <pre>
 <%- state.events.each do |event| -%>
 <%- if event.details.empty? -%>
 <%= h event.display_message %>
@@ -26,20 +27,64 @@
 <%= h event.display_message %> <%= h event.details.pretty_inspect %>
 <%- end -%>
 <%- end -%>
-      </pre>
+        </pre>
+      <% end %>
     <% end %>
   <% end %>
 
   <h3>Logs</h3>
 
-  <% logs.each do |alloc_id, steps| %>
-    <h2><%= alloc_id %></h2>
-    <% steps.each do |step_name, step | %>
-      <h3><%= step_name %></h3>
-<pre>
-<% step.each do |step| %><%= step[:time] %> <%= step[:line] %>
-<% end %>
-</pre>
+  <ul class="nav nav-tabs" id="myTab" role="tablist">
+    <% logs.each do |alloc_id, steps| %>
+      <% steps.each do |step_name, step | %>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="<%= h "#{step_name}-tab" %>" data-bs-toggle="tab" data-bs-target="#<%= h step_name %>" type="button" role="tab" aria-controls="<%= h step_name %>" aria-selected="true"><%= h step_name %></button>
+        </li>
+      <% end %>
     <% end %>
-  <% end %>
+  </ul>
+
+  <div class="tab-content" id="myTabContent">
+    <% logs.each do |alloc_id, steps| %>
+      <% steps.each do |step_name, step | %>
+        <div class="tab-pane fade" id="<%= h step_name %>">
+          <h3><%= h step_name %></h3>
+          <table class="table table-borderless table-sm">
+            <%- step.each do |step| -%>
+              <tr>
+                <td class="time">
+                  <%= step[:time].to_s("%T.%L") + "\n" %>
+                </td>
+                <td class="line">
+                  <%= h step[:line] + "\n" %>
+                </td>
+              </tr>
+            <% end %>
+          </table>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
 </div>
+
+<style>
+  td.time, td.line {
+    font-size: 16px;
+  }
+  td.line {
+    font-family: "SFMono-Regular", Monaco, Menlo, Consolas, "Liberation Mono", Courier, monospace;
+  }
+</style>
+
+<script>
+  document
+  var triggerTabList = [].slice.call(document.querySelectorAll('#myTab button'))
+  triggerTabList.forEach(function (triggerEl) {
+    var tabTrigger = new bootstrap.Tab(triggerEl)
+
+    triggerEl.addEventListener('click', function (event) {
+      event.preventDefault()
+      tabTrigger.show()
+    })
+  })
+</script>

@@ -1,0 +1,24 @@
+[
+  ../../cue/schema.cue
+  ../../src/bitte_ci/artificer.cr
+  ../../src/bitte_ci/cli.cr
+  ../../src/bitte_ci/cli/server.cr
+  ../../src/bitte_ci/connection.cr
+  ../../src/bitte_ci/github_hook.cr
+  ../../src/bitte_ci/job_config.cr
+  ../../src/bitte_ci/line.cr
+  ../../src/bitte_ci/loki.cr
+  ../../src/bitte_ci/magic.cr
+  ../../src/bitte_ci/model.cr
+  ../../src/bitte_ci/runner.cr
+  ../../src/bitte_ci/server.cr
+  ../../src/bitte_ci/simple_config.cr
+  ../../src/bitte_ci/time.cr
+  ../../src/bitte_ci/trigger.cr
+  ../../src/bitte_ci/uuid.cr
+  ../../src/views/404.ecr
+  ../../src/views/build.ecr
+  ../../src/views/index.ecr
+  ../../src/views/layout.ecr
+  ../../src/views/pull_request.ecr
+]

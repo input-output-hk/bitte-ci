@@ -306,6 +306,8 @@ module Git
 
   class Repository
     include Helper
+    extend Helper
+
     @repo : LibGit::Repository
 
     def initialize(path, bare)
@@ -336,6 +338,11 @@ module Git
       check(LibGit.git_oid_fromstr(out oid, rev))
       check(LibGit.git_object_lookup(out obj, @repo, pointerof(oid), LibGit::OBJECT::ANY))
       obj
+    end
+
+    def remote_lookup(name)
+      check(LibGit.git_remote_lookup(out remote, @repo, name))
+      remote
     end
   end
 

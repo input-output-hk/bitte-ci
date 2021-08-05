@@ -1,0 +1,9 @@
+[
+  ../../src/bitte_ci/cli.cr
+  ../../src/bitte_ci/cli/listen.cr
+  ../../src/bitte_ci/line.cr
+  ../../src/bitte_ci/listener.cr
+  ../../src/bitte_ci/simple_config.cr
+  ../../src/bitte_ci/time.cr
+  ../../src/bitte_ci/uuid.cr
+]

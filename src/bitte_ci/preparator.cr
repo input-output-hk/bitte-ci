@@ -18,6 +18,9 @@ module BitteCI
 
       @[Option(help: "git checkout SHA")]
       property sha : String
+
+      @[Option(help: "number of the PR")]
+      property pr_number : UInt64
     end
 
     def self.run(config)
@@ -28,11 +31,15 @@ module BitteCI
     end
 
     def run
-      Log.info &.emit("Starting Preparator", config: @config.inspect)
+      Log.info {
+        "Using commit #{@config.sha} from repo #{@config.clone_url}"
+      }
 
       Git.init
       repo = Git.clone(@config.clone_url.to_s, "/alloc/repo")
       if repo
+        remote = repo.remote_lookup("origin")
+        Git.remote_fetch(remote, ["refs/pull/#{@config.pr_number}/head"])
         repo.reset(@config.sha)
       else
         raise "Git clone failed"

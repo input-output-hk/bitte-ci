@@ -3,9 +3,11 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05";
-    bitte.url = "github:input-output-hk/bitte/nix-driver-with-profiles";
+    bitte.url = "github:input-output-hk/bitte";
+    # bitte.inputs.hydra.inputs.nix.inputs.nixpkgs.follows = "nixpkgs";
+    hydra.follows = "bitte/hydra";
     arion.url = "github:hercules-ci/arion";
-    bitte-ci-frontend.url = "github:input-output-hk/bitte-ci-frontend";
+    inclusive.url = "github:input-output-hk/nix-inclusive";
 
     # requires this PR https://github.com/NixOS/nix/pull/5082
     nix.url = "github:NixOS/nix";
@@ -31,69 +33,48 @@
 
   outputs = { self, ... }@inputs:
     let
-      overlay = final: prev:
-        let
-          src = prev.lib.sourceFilesBySuffices ./. [
-            ".cr"
-            ".ecr"
-            ".lock"
-            ".yml"
-            ".cue"
-            ".fixture"
-          ];
-        in {
-          nix = inputs.nix.packages.${prev.system}.nix;
+      overlay = final: prev: {
+        nix = inputs.nix.packages.${prev.system}.nix;
+        inclusive = inputs.inclusive.lib.inclusive;
+        nomad = inputs.bitte.legacyPackages.${prev.system}.nomad;
 
-          nomad = inputs.bitte.legacyPackages.${prev.system}.nomad;
-
-          http-parser-static = prev.callPackage ./pkgs/http-parser { };
-
-          libgit2 = final.callPackage ./pkgs/libgit2 {
-            inherit (prev.darwin.apple_sdk.frameworks) Security;
-          };
-
-          bitte-ci = prev.callPackage ./pkgs/bitte-ci { inherit src; };
-
-          bitte-ci-static = final.callPackage ./pkgs/bitte-ci {
-            inherit src;
-            inherit (prev.pkgsMusl) clang10Stdenv llvm_10;
-            inherit (prev.pkgsStatic)
-              gmp openssl pcre libevent libyaml zlib file libgit2 libssh2 bdwgc;
-            static = true;
-          };
-
-          bitte-ci-frontend =
-            inputs.bitte-ci-frontend.defaultPackage.${prev.system};
-
-          crystal = final.callPackage ./pkgs/crystal {
-            oldCrystal = prev.crystal;
-            src = inputs.crystal-src;
-          };
-
-          bdwgc = final.callPackage ./pkgs/bdwgc {
-            src = inputs.bdwgc-src;
-            libatomic_ops = inputs.libatomic_ops;
-          };
-
-          arion = inputs.arion.defaultPackage.${prev.system};
-
-          reproxy = prev.callPackage ./pkgs/reproxy { };
-
-          ngrok = prev.callPackage ./pkgs/ngrok { };
-
-          tests = final.callPackage ./tests { inherit inputs; };
-
-          project = inputs.arion.lib.build {
-            modules = [ ./arion-compose.nix ];
-            pkgs = final;
-          };
+        libgit2 = final.callPackage ./pkgs/libgit2 {
+          inherit (prev.darwin.apple_sdk.frameworks) Security;
         };
+
+        bitte-ci = final.callPackage ./pkgs/bitte-ci { };
+
+        crystal = final.callPackage ./pkgs/crystal {
+          oldCrystal = prev.crystal;
+          src = inputs.crystal-src;
+        };
+
+        bdwgc = final.callPackage ./pkgs/bdwgc {
+          src = inputs.bdwgc-src;
+          libatomic_ops = inputs.libatomic_ops;
+        };
+
+        arion = inputs.arion.defaultPackage.${prev.system};
+
+        reproxy = prev.callPackage ./pkgs/reproxy { };
+
+        ngrok = prev.callPackage ./pkgs/ngrok { };
+
+        tests = final.callPackage ./tests { inherit inputs; };
+
+        project = inputs.arion.lib.build {
+          modules = [ ./arion-compose.nix ];
+          pkgs = final;
+        };
+      };
 
       pkgs = import inputs.nixpkgs {
         system = "x86_64-linux";
         overlays = [ overlay ];
       };
     in {
+      inherit inputs;
+
       nixosModules.bitte-ci = import ./modules/bitte-ci.nix;
 
       legacyPackages.x86_64-linux = pkgs;
@@ -107,8 +88,6 @@
 
         # requires https://github.com/NixOS/nix/pull/4983
         # BITTE_CI_POSTGRES_URL = "postgres://postgres@127.0.0.1/bitte_ci";
-
-        FRONTEND_PATH = pkgs.bitte-ci-frontend;
 
         shellHook = ''
           export GITHUB_TOKEN="$(awk '/github.com/ {print $6;exit}' ~/.netrc)"

@@ -55,7 +55,6 @@ let
   bitteConfig = pkgs.writeText "bitte.json" (builtins.toJSON {
     public_url = "http://127.0.0.1:9494";
     postgres_url = "postgres://bitte_ci@127.0.0.1:5432/bitte_ci";
-    frontend_path = builtins.toString pkgs.bitte-ci-frontend;
     github_user_content_base_url = "http://localhost:9090";
     github_hook_secret_file =
       builtins.toFile "secret" "oos0kahquaiNaiciz8MaeHohNgaejien";
@@ -72,7 +71,7 @@ let
     set -exuo pipefail
 
     export PATH="${lib.makeBinPath [ pkgs.cue ]}:$PATH"
-    ${pkgs.bitte-ci}/bin/bitte-ci queue --config ${bitteConfig} < ${pr}
+    ${pkgs.bitte-ci.queue}/bin/bitte-ci-queue --config ${bitteConfig} < ${pr}
   '';
 
   checkJob = pkgs.writeShellScript "check.sh" ''
@@ -133,28 +132,6 @@ let
         in { legacyPackages.x86_64-linux = pkgs; };
     }
   '';
-
-  testFlakeLock = pkgs.writeText "flake.lock" (builtins.toJSON {
-    root = "root";
-    version = 7;
-    nodes = {
-      root.inputs.nixpkgs = "nixpkgs";
-      nixpkgs = {
-        locked = {
-          inherit (inputs.nixpkgs) rev lastModified narHash;
-          owner = "NixOS";
-          repo = "nixpkgs";
-          type = "github";
-        };
-        original = {
-          owner = "NixOS";
-          ref = "nixos-21.05";
-          repo = "nixpkgs";
-          type = "github";
-        };
-      };
-    };
-  });
 
   ciCue = pkgs.writeText "ci.cue" ''
     package ci
@@ -227,8 +204,8 @@ in pkgs.nixosTest {
         hello
         grafana-loki
 
-        crystal
-        bitte-ci
+        bitte-ci.prepare-static
+        bitte-ci.command-static
         file
       ];
 
@@ -246,7 +223,9 @@ in pkgs.nixosTest {
         # registry.nixpkgs.flake = inputs.nixpkgs;
         # registry.crystal-src.flake = inputs.crystal-src;
 
-        registry = lib.mapAttrs (name: flake: { inherit flake; }) inputs;
+        registry = let m = lib.mapAttrs (name: flake: { inherit flake; });
+        in (m inputs) // (m inputs.inclusive.inputs) // (m inputs.bitte.inputs)
+        // (m inputs.hydra.inputs) // (m inputs.nix.inputs);
 
         extraOptions = ''
           experimental-features = nix-command flakes ca-references
@@ -336,7 +315,7 @@ in pkgs.nixosTest {
 
             client = {
               enabled = true;
-              reserved.memory = 256;
+              reserved.memory = 512;
               chroot_env = { "/etc/passwd" = "/etc/passwd"; };
             };
           };
@@ -416,7 +395,7 @@ in pkgs.nixosTest {
     ci.wait_for_open_port(9494)
 
     ci.log(ci.succeed("${bitteCiFlake}"))
-    ci.log(ci.succeed("nix build ${repo}#bitte-ci"))
+    ci.log(ci.succeed("nix build ${repo}#bitte-ci.prepare-static"))
 
     ci.log(ci.succeed("${queueJob}"))
 

@@ -29,6 +29,7 @@ module BitteCI
       @timer = Channel(Time).new(0)
       @done = Channel(Nil).new
       @stopping = false
+      @log = ::Log.for("Loki")
     end
 
     def start
@@ -36,7 +37,7 @@ module BitteCI
       spawn { push_loop }
     end
 
-    def start(&block)
+    def run(&block)
       start
       result = yield
     ensure
@@ -45,7 +46,7 @@ module BitteCI
     end
 
     def stop
-      Log.info &.emit("Loki#stop")
+      @log.info { "stop" }
       @inbox.close
       @timer.close
       @stopping = true
@@ -55,15 +56,15 @@ module BitteCI
     private def socket(name)
       left, right = UNIXSocket.pair
       right.sync = true
-      labels = @labels.merge({"pipe" => name})
-      spawn { right.each_line { |line| log(line, labels) } }
+      spawn { right.each_line { |line| log(line, {"pipe" => name}) } }
       left
     end
 
-    def sh(cmd, args)
+    def sh(cmd, args, chdir)
       Process.new(
         cmd,
         args: args,
+        chdir: chdir,
         input: Process::Redirect::Close,
         output: socket("stdout"),
         error: socket("stderr"),
@@ -77,7 +78,7 @@ module BitteCI
         @timer.send Time.utc
       end
     rescue e : Channel::ClosedError
-      Log.error &.emit("Loki#time_loop", error: e.to_s)
+      @log.error &.emit("time_loop", error: e.to_s)
     end
 
     def push_loop
@@ -101,14 +102,14 @@ module BitteCI
         end
       end
     rescue e : Channel::ClosedError
-      Log.error &.emit("Loki#collect", error: e.to_s) unless @stopping
+      @log.error &.emit("collect", error: e.to_s) unless @stopping
     ensure
       push(collected) if collected
     end
 
     def push(collected : Array(Value))
       return if collected.empty?
-      Log.info &.emit("loki#push", collected: collected.size)
+      @log.info &.emit("push", collected: collected.size)
 
       grouped = collected.group_by do |coll|
         coll.labels
@@ -132,31 +133,33 @@ module BitteCI
 
       case res.status
       when HTTP::Status::NO_CONTENT
-        Log.info &.emit("Loki#push", response: res.inspect)
+        @log.info &.emit("push", response: res.inspect)
       when HTTP::Status::IM_A_TEAPOT
-        Log.info { "Kettle boiling over!" }
+        @log.info { "Kettle boiling over!" }
       else
-        Log.error &.emit("Loki#push", response: res.inspect)
+        @log.error &.emit("push", response: res.inspect)
       end
     ensure
       @done.send nil if @stopping
     end
 
-    def log(text : String, labels : Hash(String, String))
-      # Log.info &.emit("loki#log", text: text)
-      Log.info &.emit("loki#log", text: text, labels: labels)
-      @inbox.send Value.new(Time.utc, text, labels)
+    def log(text : String, labels : Hash(String, String) = @labels)
+      merged_labels = @labels.merge(labels)
+      @log.debug &.emit(text: text, labels: merged_labels)
+      @log.info { text }
+      @inbox.send Value.new(Time.utc, text, merged_labels)
     rescue e : Channel::ClosedError
-      Log.error &.emit("Loki#log", error: e.to_s) unless @stopping
+      @log.error &.emit("log", error: e.to_s) unless @stopping
     end
 
     def self.query_range(loki_base_url, loki_id, from, to)
       query = URI::Params.new(
         {
-          "direction" => ["FORWARD"],
+          "direction" => ["backward"],
           "query"     => [%({bitte_ci_id="#{loki_id}"})],
           "start"     => [(from.to_unix_ms * 1000000).to_s],
           "end"       => [((to || Time.utc).to_unix_ms * 1000000).to_s],
+          "limit"     => ["1000"],
         }
       )
 
@@ -164,7 +167,7 @@ module BitteCI
       url.path = "/loki/api/v1/query_range"
       url.query = query.to_s
 
-      Log.info { "querying #{url}" }
+      Log.debug { "querying #{url}" }
 
       res = HTTP::Client.get(url)
 
@@ -173,7 +176,6 @@ module BitteCI
       logs = Hash(UUID, Hash(String, Array(NamedTuple(time: Time, line: String)))).new
 
       range.data.result.each do |result|
-        Log.info { result.inspect }
         alloc_id = UUID.new(result.stream["nomad_alloc_id"])
         step_name = result.stream["bitte_ci_step"]
 

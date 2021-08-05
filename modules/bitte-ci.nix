@@ -7,7 +7,7 @@ in {
 
       package = lib.mkOption {
         type = lib.types.package;
-        default = pkgs.bitte-ci-static;
+        default = pkgs.bitte-ci;
       };
 
       publicUrl = lib.mkOption { type = lib.types.str; };
@@ -17,11 +17,6 @@ in {
       nomadUrl = lib.mkOption { type = lib.types.str; };
 
       lokiUrl = lib.mkOption { type = lib.types.str; };
-
-      frontendPath = lib.mkOption {
-        type = lib.types.path;
-        default = pkgs.bitte-ci-frontend;
-      };
 
       nomadTokenFile = lib.mkOption { type = lib.types.str; };
 
@@ -67,7 +62,6 @@ in {
     flags = {
       public-url = cfg.publicUrl;
       postgres-url = cfg.postgresUrl;
-      frontend-path = builtins.toString cfg.frontendPath;
       github-user-content-base-url = cfg.githubUserContentUrl;
       github-hook-secret-file = cfg.githubHookSecretFile;
       nomad-base-url = cfg.nomadUrl;
@@ -91,9 +85,9 @@ in {
 
     serverFlags = toFlags ({
       inherit (flags)
-        postgres-url public-url github-user github-token-file frontend-path
-        loki-base-url github-hook-secret-file github-user-content-base-url
-        nomad-base-url nomad-token-file runner-flake nomad-datacenters;
+        postgres-url public-url github-user github-token-file loki-base-url
+        github-hook-secret-file github-user-content-base-url nomad-base-url
+        nomad-token-file runner-flake nomad-datacenters;
     } // certs);
 
     migrateFlags = toFlags { inherit (flags) postgres-url; };
@@ -108,7 +102,7 @@ in {
       # environment.KEMAL_ENV = "production";
 
       serviceConfig = {
-        ExecStart = "${cfg.package}/bin/bitte-ci server ${serverFlags}";
+        ExecStart = "${cfg.package.server}/bin/bitte-ci-server ${serverFlags}";
         Restart = "on-failure";
         RestartSec = "5s";
       };
@@ -124,7 +118,7 @@ in {
       ];
       wantedBy = [ "multi-user.target" ];
       serviceConfig = {
-        ExecStart = "${cfg.package}/bin/bitte-ci listen ${listenFlags}";
+        ExecStart = "${cfg.package.listen}/bin/bitte-ci-listen ${listenFlags}";
         Restart = "on-failure";
         RestartSec = "5s";
       };
@@ -141,7 +135,8 @@ in {
       script = "";
 
       serviceConfig = {
-        ExecStart = "${cfg.package}/bin/bitte-ci migrate ${migrateFlags}";
+        ExecStart =
+          "${cfg.package.migrate}/bin/bitte-ci-migrate ${migrateFlags}";
         Type = "oneshot";
         RemainAfterExit = true;
         Restart = "on-failure";

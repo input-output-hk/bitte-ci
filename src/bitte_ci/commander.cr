@@ -3,6 +3,7 @@ require "./uuid"
 require "./loki"
 require "file_utils"
 require "./artificer"
+require "./libgit2"
 
 module BitteCI
   class Commander
@@ -38,6 +39,9 @@ module BitteCI
 
       @[Option(help: "outputs to upload")]
       property outputs : Array(String) = [] of String
+
+      @[Option(help: "git checkout SHA")]
+      property sha : String
 
       # Everything below here is usually set by Nomad through environment variables
 
@@ -92,6 +96,9 @@ module BitteCI
       end
     end
 
+    REPO_ALLOC = "/alloc/repo"
+    REPO_LOCAL = "/local/repo"
+
     def self.run(config)
       new(config).run
     end
@@ -104,12 +111,12 @@ module BitteCI
     end
 
     def run
-      Log.info { "Starting Commander with #{@config.inspect}" }
+      status = @loki.run do
+        copy_repo
+        pre_start
 
-      pre_start
-
-      status = @loki.start do
-        process = @loki.sh(@config.command, @config.args)
+        @loki.log "#{@config.command} #{@config.args.join(" ")}"
+        process = start_process
 
         start_forwarder(process)
         start_wait(process)
@@ -128,9 +135,21 @@ module BitteCI
       exit status.exit_status
     end
 
+    def start_process
+      chdir = File.directory?(REPO_ALLOC) ? REPO_ALLOC : nil
+      @loki.sh(@config.command, @config.args, chdir)
+    end
+
+    def copy_repo
+      return unless File.directory?(REPO_ALLOC)
+      Git.init
+      repo = Git.clone(REPO_ALLOC, REPO_LOCAL)
+      repo.reset(@config.sha)
+    end
+
     def pre_start
       @config.after.each do |task_name|
-        Log.info { "Waiting for completion of #{task_name}" }
+        @loki.log "Waiting for completion of step: #{task_name}"
         file = File.join("/alloc/.bitte-ci/", task_name)
         until File.file?(file)
           sleep 1

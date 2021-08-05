@@ -130,7 +130,7 @@ module BitteCI
         @[JSON::Field(key: "FinishedAt")]
         property finished_at : Time?
 
-        @[JSON::Field(key: "LastRestart", converter: Time::EpochNanosConverter)]
+        @[JSON::Field(key: "LastRestart")]
         property last_restart : Time?
 
         @[JSON::Field(key: "Restarts")]
@@ -159,6 +159,7 @@ module BitteCI
 
           @[JSON::Field(key: "DownloadError")]
           property download_error : String
+
           @[JSON::Field(key: "DriverError")]
           property driver_error : String
 
