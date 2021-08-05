@@ -125,7 +125,7 @@ let
             bitte-ci = inputs.bitte-ci.packages.x86_64-linux.bitte-ci;
           };
 
-          pkgs = import nixpkgs {
+          pkgs = import nixpkgs.outPath {
             system = "x86_64-linux";
             overlays = [ overlay ];
           };
@@ -186,13 +186,17 @@ in pkgs.nixosTest {
   name = "bitte-ci";
 
   nodes = {
-    ci = {
+    ci = { config, ... }: {
       imports = [ ../modules/bitte-ci.nix ];
 
       # Nomad exec driver is incompatible with cgroups v2
       systemd.enableUnifiedCgroupHierarchy = false;
       virtualisation.memorySize = 5 * 1024;
       virtualisation.diskSize = 2 * 1024;
+      virtualisation.pathsInNixDB = builtins.attrValues inputs;
+      # virtualisation.pathsInNixDB = lib.pipe config.nix.registry [
+      #   (lib.mapAttrsToList (_: v: v.flake or {}))
+      # ];
 
       # dependencies required for the ci runner script
       system.extraDependencies = with pkgs; [
@@ -225,7 +229,7 @@ in pkgs.nixosTest {
 
         registry = let m = lib.mapAttrs (name: flake: { inherit flake; });
         in (m inputs) // (m inputs.inclusive.inputs) // (m inputs.bitte.inputs)
-        // (m inputs.hydra.inputs) // (m inputs.nix.inputs);
+        // (m inputs.hydra.inputs) // (m inputs.nix.inputs) // (m inputs.nixpkgs.inputs);
 
         extraOptions = ''
           experimental-features = nix-command flakes ca-references
@@ -395,7 +399,7 @@ in pkgs.nixosTest {
     ci.wait_for_open_port(9494)
 
     ci.log(ci.succeed("${bitteCiFlake}"))
-    ci.log(ci.succeed("nix build ${repo}#bitte-ci.prepare-static"))
+    ci.log(ci.succeed("nix build --offline ${repo}#bitte-ci.prepare-static"))
 
     ci.log(ci.succeed("${queueJob}"))
 
