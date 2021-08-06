@@ -92,18 +92,15 @@
       "inputs": {
         "nix": "nix",
         "nixpkgs": [
-          "bitte",
-          "hydra",
-          "nix",
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1627577092,
-        "narHash": "sha256-Uj0N7fbypQtn8m26cdR2UYK1xTB1QMXZ0lfzz1y+Bgw=",
-        "owner": "NixOS",
+        "lastModified": 1628109440,
+        "narHash": "sha256-5izHapMbLktrlL5Po24TZ+SJhJnQAFlXOYaeP4aIick=",
+        "owner": "kreisys",
         "repo": "hydra",
-        "rev": "4e9455160270b9b933582501a47430690d66e5b4",
+        "rev": "b252af382b38060e07bebbe46e1f147d1772c09f",
         "type": "github"
       },
       "original": {
@@ -222,13 +219,15 @@
       "locked": {
         "lastModified": 1627913633,
         "narHash": "sha256-vwj1fAGn3Pl9Vr/qSL+oDxuwbRzEdI3dsEg6o3xTmWg=",
-        "path": "/nix/store/s316ggzxykw9b8w801jdjx1nsb1i2rv3-source",
+        "owner": "NixOS",
+        "repo": "nix",
         "rev": "47e96bb533f8cacc171bec9b688b134de31a48a9",
-        "type": "path"
+        "type": "github"
       },
       "original": {
-        "id": "nix",
-        "type": "indirect"
+        "owner": "NixOS",
+        "repo": "nix",
+        "type": "github"
       }
     },
     "nix_2": {
@@ -405,6 +404,23 @@
         "type": "github"
       }
     },
+    "nomad-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1627411190,
+        "narHash": "sha256-cheZRUMhLqrwCV5t3hMJGyQrurSmPIhHGAzEt6A7+qA=",
+        "owner": "input-output-hk",
+        "repo": "nomad",
+        "rev": "758c3e852f174f38b1954f84d60ccb880a10cfa2",
+        "type": "github"
+      },
+      "original": {
+        "owner": "input-output-hk",
+        "ref": "release-1.1.2",
+        "repo": "nomad",
+        "type": "github"
+      }
+    },
     "ops-lib": {
       "flake": false,
       "locked": {
@@ -427,14 +443,11 @@
         "bdwgc-src": "bdwgc-src",
         "bitte": "bitte",
         "crystal-src": "crystal-src",
-        "hydra": [
-          "bitte",
-          "hydra"
-        ],
         "inclusive": "inclusive",
         "libatomic_ops": "libatomic_ops",
         "nix": "nix_2",
-        "nixpkgs": "nixpkgs_8"
+        "nixpkgs": "nixpkgs_8",
+        "nomad-src": "nomad-src"
       }
     },
     "stdlib": {

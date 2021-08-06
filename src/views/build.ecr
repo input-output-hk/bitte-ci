@@ -6,11 +6,34 @@
   </div>
 
   <hr/>
+  <h3>Outputs</h3>
 
-  <% if alloc %>
-    <h3>Allocations</h3>
+  <table class="table">
+    <thead>
+      <tr>
+        <td>Path</td>
+        <td>Size</td>
+        <td>Mime</td>
+        <td>SHA256</td>
+      </tr>
+    </thead>
+    <tbody>
+      <% outputs.each do |output| %>
+        <tr>
+          <td><a href="/api/v1/output/<%= output.id %>"><%= h output.path %></a></td>
+          <td><%= h output.size.humanize %></td>
+          <td><%= h output.mime %></td>
+          <td><%= h output.sha256 %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
 
-    <% a = alloc.parsed.allocation %>
+  <% if failing_alloc %>
+    <hr/>
+    <h3>Allocation Errors</h3>
+
+    <% a = failing_alloc.parsed.allocation %>
     <div>Description: <%= h a.client_description %></div>
     <div>Client Status: <%= h a.client_status %></div>
     <div>Created: <%= a.create_time %></div>
@@ -19,19 +42,20 @@
         <h4><%= h name %></h4>
         <div>State: <%= h state.state %></div>
         <div>Finished at: <%= state.finished_at %></div>
-        <pre>
-<%- state.events.each do |event| -%>
-<%- if event.details.empty? -%>
-<%= h event.display_message %>
-<%- else -%>
-<%= h event.display_message %> <%= h event.details.pretty_inspect %>
-<%- end -%>
-<%- end -%>
-        </pre>
+        <table class="table table-borderless table-sm">
+          <tbody>
+            <% state.events.each do |event| %>
+              <tr>
+                <td class="line"><%= h event %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
       <% end %>
     <% end %>
   <% end %>
 
+  <hr/>
   <h3>Logs</h3>
 
   <ul class="nav nav-tabs" id="myTab" role="tablist">
@@ -48,16 +72,11 @@
     <% logs.each do |alloc_id, steps| %>
       <% steps.each do |step_name, step | %>
         <div class="tab-pane fade" id="<%= h step_name %>">
-          <h3><%= h step_name %></h3>
           <table class="table table-borderless table-sm">
             <%- step.each do |step| -%>
               <tr>
-                <td class="time">
-                  <%= step[:time].to_s("%T.%L") + "\n" %>
-                </td>
-                <td class="line">
-                  <%= h step[:line] + "\n" %>
-                </td>
+                <td class="time"><%= step[:time].to_s("%T.%L") %></td>
+                <td class="line"><%= h step[:line].rstrip %></td>
               </tr>
             <% end %>
           </table>
@@ -69,22 +88,36 @@
 
 <style>
   td.time, td.line {
-    font-size: 16px;
+    font-size: 0.7em;
   }
+
+  td.time {
+    user-select: none;
+    width: 7em;
+  }
+
   td.line {
     font-family: "SFMono-Regular", Monaco, Menlo, Consolas, "Liberation Mono", Courier, monospace;
+    white-space: pre-wrap;
+    vertical-align: middle;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 </style>
 
 <script>
-  document
   var triggerTabList = [].slice.call(document.querySelectorAll('#myTab button'))
   triggerTabList.forEach(function (triggerEl) {
     var tabTrigger = new bootstrap.Tab(triggerEl)
 
     triggerEl.addEventListener('click', function (event) {
       event.preventDefault()
+      document.location.hash = triggerEl.dataset.bsTarget
       tabTrigger.show()
     })
+
+    if (document.location.hash === triggerEl.dataset.bsTarget) {
+      tabTrigger.show()
+    }
   })
 </script>

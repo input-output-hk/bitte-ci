@@ -1,4 +1,5 @@
 [
+  ../../README.md
   ../../cue/schema.cue
   ../../src/bitte_ci/artificer.cr
   ../../src/bitte_ci/cli.cr

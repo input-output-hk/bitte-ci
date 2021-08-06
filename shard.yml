@@ -6,7 +6,19 @@ authors:
 
 targets:
   bitte-ci:
-    main: src/bitte_ci.cr
+    main: src/bitte_ci/cli/bitte-ci.cr
+  bitte-ci-command:
+    main: src/bitte_ci/cli/command.cr
+  bitte-ci-listen:
+    main: src/bitte_ci/cli/listen.cr
+  bitte-ci-migrate:
+    main: src/bitte_ci/cli/migrate.cr
+  bitte-ci-prepare:
+    main: src/bitte_ci/cli/prepare.cr
+  bitte-ci-queue:
+    main: src/bitte_ci/cli/queue.cr
+  bitte-ci-server:
+    main: src/bitte_ci/cli/server.cr
 
 crystal: 1.0.0
 
@@ -18,7 +30,7 @@ dependencies:
   clear:
     github: anykeyh/clear
     branch: master
-  habitat:
-    github: luckyframework/habitat
   magic:
     github: naqvis/magic.cr
+  markd:
+    github: icyleaf/markd

@@ -2,7 +2,7 @@
 , crystal, llvm_10, pcre, libevent, libyaml, zlib, file, libgit2, libssh2, bdwgc
 , removeReferencesTo, callPackage, inclusive, extraArgs }:
 let
-  pname = if extraArgs.name == "src/bitte_ci.cr" then
+  pname = if extraArgs.name == "bitte-ci" then
     "bitte-ci"
   else
     "bitte-ci-${extraArgs.name}";

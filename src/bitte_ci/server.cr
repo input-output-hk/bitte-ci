@@ -1,13 +1,15 @@
 require "clear"
 require "kemal"
-require "./uuid"
-require "./simple_config"
-require "./connection"
-require "./model"
-require "./loki"
-require "./trigger"
-require "./runner"
+require "markd"
+
 require "./artificer"
+require "./connection"
+require "./loki"
+require "./model"
+require "./runner"
+require "./simple_config"
+require "./trigger"
+require "./uuid"
 
 module BitteCI
   class Server
@@ -89,13 +91,20 @@ module BitteCI
       halt env, status_code: 404, response: render("src/views/404.ecr", "src/views/layout.ecr")
     end
 
-    def h(s)
-      case s
-      in String
-        HTML.escape(s)
-      in Nil
-        ""
+    def h(event : Listener::AllocationPayloadAllocation::TaskStates::Event)
+      if event.details.empty?
+        h event.display_message
+      else
+        h "#{event.display_message} #{event.details.pretty_inspect}"
       end
+    end
+
+    def h(s : String)
+      HTML.escape(s)
+    end
+
+    def h(n : Nil)
+      ""
     end
 
     def start
@@ -117,6 +126,12 @@ module BitteCI
         title = "Bitte CI"
         prs = PullRequest.query.to_a.sort_by { |pr| pr.created_at }
         render "src/views/index.ecr", "src/views/layout.ecr"
+      end
+
+      get "/about" do
+        content = Markd.to_html({{ read_file "README.md" }})
+        title = "About"
+        render "src/views/layout.ecr"
       end
 
       get "/pull_request/:id" do |env|
@@ -145,6 +160,15 @@ module BitteCI
         pr = build.pull_request
         allocs = Allocation.query
           .where { data.jsonb("Allocation.JobID") == pr.job_id }
+
+        # FIXME: this generates way too many queries.
+        outputs = allocs.map { |alloc|
+          alloc.outputs.select(:id, :size, :created_at, :alloc_id, :path, :mime, :sha256).to_a
+        }.select { |outputs|
+          outputs.any?
+        }.flatten
+
+        failing_alloc = allocs
           .to_a
           .select { |alloc|
             parsed = alloc.parsed
@@ -156,8 +180,7 @@ module BitteCI
             }
           }
           .sort_by { |alloc| alloc.created_at }
-
-        alloc = allocs.last?
+          .last?
 
         render "src/views/build.ecr", "src/views/layout.ecr"
       end
@@ -208,9 +231,9 @@ module BitteCI
       get "/api/v1/output/:id" do |env|
         output = Output.query.where { var("id") == env.params.url["id"] }.first
         if output
-          env.response.headers["Content-Type"] = "application/octet-stream"
+          env.response.headers["Content-Type"] = output.mime
           env.response.headers["Content-Disposition"] = %(attachment; filename="#{File.basename(output.path)}")
-          File.read(File.join("output", output.sha256))
+          File.read(File.join("output", output.sha256[0..5], output.sha256))
         else
           halt env, status_code: 404, response: "Not Found"
         end

@@ -207,9 +207,12 @@ class Allocation
 
   has_many outputs : Output, foreign_key: "alloc_id"
 
+  @parsed : ::BitteCI::Listener::AllocationPayload?
+
   # TODO: Optimize this (see https://github.com/anykeyh/clear/issues/95 )!
   def parsed
-    ::BitteCI::Listener::AllocationPayload.from_json(data.to_json)
+    @parsed ||=
+      ::BitteCI::Listener::AllocationPayload.from_json(data.to_json)
   end
 
   def simplify

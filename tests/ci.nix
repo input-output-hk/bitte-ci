@@ -11,7 +11,7 @@ let
       mkdir -p $out
       cd $out
       git init
-      cp ${ciCue} ci.cue
+      cp ${./ci.cue} ci.cue
       cp ${testFlake} flake.nix
       cp ${../flake.lock} flake.lock
       git add .
@@ -133,24 +133,6 @@ let
     }
   '';
 
-  ciCue = pkgs.writeText "ci.cue" ''
-    package ci
-
-    ci: steps: {
-      hello: {
-        command: ["bash", "-c", "hello -t > /alloc/hello; hello -t"]
-        flakes: "git://127.0.0.1:7070/": ["bash", "hello"]
-        outputs: ["/alloc/hello"]
-      },
-      bye: {
-        after: ["hello"]
-        command: ["bash", "-c", "hello -g goodbye > /local/bye; hello -g goodbye"]
-        flakes: "git://127.0.0.1:7070/": ["bash", "hello"]
-        outputs: ["/local/bye"]
-      }
-    }
-  '';
-
   fakeGithub = pkgs.writeText "github.rb" ''
     require "webrick"
     require "json"
@@ -172,7 +154,7 @@ let
 
     server.mount_proc "/iog/ci/${rev}/ci.cue" do |req, res|
       puts "Received ci.cue request"
-      res.body = File.read("${ciCue}")
+      res.body = File.read("${./ci.cue}")
       res.status = 200
     end
 
@@ -193,6 +175,13 @@ in pkgs.nixosTest {
       systemd.enableUnifiedCgroupHierarchy = false;
       virtualisation.memorySize = 5 * 1024;
       virtualisation.diskSize = 2 * 1024;
+      virtualisation.pathsInNixDB = (builtins.attrValues inputs)
+        ++ (with pkgs; [
+          bitte-ci.command
+          bitte-ci.command-static
+          bitte-ci.prepare
+          bitte-ci.prepare-static
+        ]);
 
       # dependencies required for the ci runner script
       system.extraDependencies = with pkgs; [
@@ -203,10 +192,6 @@ in pkgs.nixosTest {
         git
         hello
         grafana-loki
-
-        bitte-ci.prepare-static
-        bitte-ci.command-static
-        file
       ];
 
       environment.systemPackages = with pkgs; [
@@ -224,8 +209,7 @@ in pkgs.nixosTest {
         # registry.crystal-src.flake = inputs.crystal-src;
 
         registry = let m = lib.mapAttrs (name: flake: { inherit flake; });
-        in (m inputs) // (m inputs.inclusive.inputs) // (m inputs.bitte.inputs)
-        // (m inputs.hydra.inputs) // (m inputs.nix.inputs);
+        in (m inputs) // (m inputs.inclusive.inputs);
 
         extraOptions = ''
           experimental-features = nix-command flakes ca-references

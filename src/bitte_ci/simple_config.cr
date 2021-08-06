@@ -5,26 +5,11 @@ require "option_parser"
 module SimpleConfig
   module Configuration
     def initialize(hash : Hash(String, String), file : String?)
-      json =
-        if file
-          JSON.parse(File.read(file))
-        else
-          JSON::Any.new({} of String => JSON::Any)
-        end
+      json = load_json(file)
+      prepare_secrets(hash, json)
 
-      {% for ivar in @type.instance_vars %}
-        {% ann = ivar.annotation(@type.constant("Option")) %}
-        {% raise "Annotation for Option #{ivar.id} missing" unless ann %}
-        {% if ann && ann[:secret] %}
-          %file_key = "{{ivar}}_file"
-          %file_env_key = "{{ann[:env]}}_FILE" || %file_key.upcase
-          %file = hash[%file_key]?
-          %file = json[%file_key]?.try(&.as_s) if %file.nil?
-          %file = ENV[%file_env_key]? if %file.nil? && %file_env_key
-          hash[{{ivar.id.stringify}}] = File.read(%file) unless %file.nil?
-        {% end %}
-      {% end %}
-
+      # TODO: remove duplication, make sure you keep this in sync with
+      # reload_config
       {% for ivar in @type.instance_vars %}
         {% ann = ivar.annotation(@type.constant("Option")) %}
         {% if ann %}
@@ -67,6 +52,80 @@ module SimpleConfig
               end
             end
           {% end %}
+        {% end %}
+      {% end %}
+    end
+
+    def load_json(file)
+      if file
+        JSON.parse(File.read(file))
+      else
+        JSON::Any.new({} of String => JSON::Any)
+      end
+    end
+
+    def reload(hash : Hash(String, String), file : String?)
+      Log.info { "Reloading configuration" }
+      json = load_json(file)
+      prepare_secrets(hash, json)
+      reload_config(hash, json)
+    end
+
+    def prepare_secrets(hash, json)
+      {% for ivar in @type.instance_vars %}
+        {% ann = ivar.annotation(@type.constant("Option")) %}
+        {% raise "Annotation for Option #{ivar} missing" unless ann %}
+        {% if ann && ann[:secret] %}
+          %file_key = "{{ivar}}_file"
+          %file_env_key = "{{ann[:env]}}_FILE" || %file_key.upcase
+          %file = hash[%file_key]?
+          %file = json[%file_key]?.try(&.as_s) if %file.nil?
+          %file = ENV[%file_env_key]? if %file.nil? && %file_env_key
+          hash[{{ivar.stringify}}] = File.read(%file) unless %file.nil?
+        {% end %}
+      {% end %}
+    end
+
+    # TODO: remove duplication, make sure you keep this in sync with initialize
+    # We can safely ignore changes to env variable and flags, so we only
+    # consider changes to the config file(s).
+    def reload_config(hash, json)
+      {% for ivar in @type.instance_vars %}
+        {% ann = ivar.annotation(@type.constant("Option")) %}
+        {% if ann %}
+          %old = @{{ivar.id}}
+
+          %value = hash[{{ivar.id.stringify}}]?
+          %value = json[{{ivar.id.stringify}}]?.try(&.as_s) if %value.nil?
+
+          {% if ivar.type.nilable? %}
+            @{{ivar.id}} = unless %value.nil?
+              show_detailed_error({{ivar.stringify}}, %value.inspect) {
+                %type = {{ivar.type.union_types.reject { |t| t == Nil }.join(" | ").id}}
+                %value.to_simple_option(%type)
+              }
+            end
+          {% else %}
+            @{{ivar.id}} =
+              case %value
+              when Nil
+                %old
+              when {{ivar.type}}
+                %value
+              else
+                show_detailed_error({{ivar.stringify}}, %value.inspect) {
+                  %value.to_simple_option({{ivar.type}})
+                }
+              end
+          {% end %}
+
+          if %old != @{{ivar.id}}
+            {% if ann[:secret] %}
+              Log.info { "Reloaded config {{ivar.id}}: <redacted> => <redacted>" }
+            {% else %}
+              Log.info { "Reloaded config {{ivar.id}}: #{%old} => #{@{{ivar.id}}}" }
+            {% end %}
+          end
         {% end %}
       {% end %}
     end
@@ -122,7 +181,7 @@ module SimpleConfig
           end
 
           if %secret
-            parser.on "--#{%long}-file=VALUE", {{ann[:help]}} do |value|
+            parser.on "--#{%long}-file=VALUE", %help do |value|
               config["{{ivar}}_file"] = value
             end
           end

@@ -39,11 +39,22 @@ module BitteCI
       config_class.option_parser(parser, flags)
     end
 
-    op.parse
-
     ::Log.builder.bind "clear.*", Log::Severity::Debug, Log::IOBackend.new
     ::Log.for(name).info { "Starting" }
-    yield(config_class.new(flags, config_file))
+
+    # We need to keep this around, but Kemal also tries to parse it
+    argv = ARGV.dup
+    op.parse(ARGV)
+    config = config_class.new(flags, config_file)
+
+    Signal::HUP.trap do
+      Log.info { "Received HUP" }
+      flags.clear
+      op.parse(argv.dup)
+      config.reload(flags, config_file)
+    end
+
+    yield(config)
   rescue e : OptionParser::MissingOption
     STDERR.puts e
     exit 1

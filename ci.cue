@@ -1,25 +1,17 @@
 package ci
 
-ci: steps: [
-	{
-		label: "Hello World!"
-		flakes: "github:NixOS/nixpkgs/nixos-21.05": ["bash", "hello"]
-		cpu:    100
-		memory: 32
-		enable: pull_request.base.ref == "master"
+ci: steps: {
+	hello: {
+		command: ["bash", "-c", "hello -t > /alloc/hello; hello -t"]
+		outputs: ["/alloc/hello"]
+	}
+}
 
-		_cmd: """
-			hello -t > /local/greeting
-			"""
-		command: ["/bin/bash", "-c", _cmd]
-		outputs: ["/local/greeting"]
-		env: {
-			PATH: "/bin"
-		}
-	},
-]
-
-isMaster: pull_request.base.ref == "master"
+// we can reference any values from the PR to control whether this PR
+// should be built.
+#isMaster: pull_request.base.ref == "master"
+#isAdmin:  sender.login == "manveru"
 
 // some default values
-#step: enable: bool | *isMaster
+#step: enable: bool | *(#isMaster && #isAdmin)
+#step: flakes: "github:NixOS/nixpkgs": ["bash", "hello"]

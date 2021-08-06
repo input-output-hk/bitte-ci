@@ -28,6 +28,8 @@ module BitteCI
       property lifecycle : String?
       property sidecar : Bool?
       property after : Array(String) = [] of String
+      property term_timeout : UInt64 = 1800
+      property kill_timeout : UInt64 = 2100
 
       def initialize(
         @label,

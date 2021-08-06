@@ -23,8 +23,8 @@ module BitteCI
         raise "Request body with the file required"
       end
 
-      size = env.request.headers["Content-Length"].to_u64
-      if size > MAX_FILESIZE
+      content_length = env.request.headers["Content-Length"]?
+      if content_length && content_length.to_u64 > MAX_FILESIZE
         raise "File larger than #{MAX_FILESIZE.humanize}"
       end
 
@@ -45,14 +45,14 @@ module BitteCI
       final = Digest::SHA256.hexdigest &.file(dest)
 
       if hash != final
-        File.delete(dest)
+        # File.delete(dest)
         raise "body doesn't match sha256, got: #{final} and expected: #{hash}"
       end
 
       output = Output.create(
         path: path,
         sha256: hash,
-        size: size,
+        size: File.size(dest),
         created_at: Time.utc,
         alloc_id: nomad_alloc_id,
         mime: mime,
@@ -78,7 +78,24 @@ module BitteCI
         form.add "sha256", Digest::SHA256.hexdigest &.file(path)
       }
 
-      HTTP::Client.put(uri, headers: HTTP::Headers{"Content-Type" => detect_mime(path)})
+      res =
+        File.open path do |io|
+          HTTP::Client.put(
+            uri,
+            body: io,
+            headers: HTTP::Headers{"Content-Type" => detect_mime(path)}
+          )
+        end
+
+      case res.status
+      when HTTP::Status::CREATED
+        res
+      else
+        Log.error &.emit("response", response: res.inspect)
+        Log.error {
+          "HTTP Error while trying to PUT output to #{uri} : #{res.status.to_i} #{res.status_message}"
+        }
+      end
     end
 
     def self.detect_mime(path) : String

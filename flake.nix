@@ -3,14 +3,17 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05";
-    bitte.url = "github:input-output-hk/bitte";
-    # bitte.inputs.hydra.inputs.nix.inputs.nixpkgs.follows = "nixpkgs";
-    hydra.follows = "bitte/hydra";
     arion.url = "github:hercules-ci/arion";
     inclusive.url = "github:input-output-hk/nix-inclusive";
+    bitte.url = "github:input-output-hk/bitte";
 
     # requires this PR https://github.com/NixOS/nix/pull/5082
     nix.url = "github:NixOS/nix";
+
+    nomad-src = {
+      url = "github:input-output-hk/nomad/release-1.1.2";
+      flake = false;
+    };
 
     crystal-src = {
       url =
@@ -34,15 +37,17 @@
   outputs = { self, ... }@inputs:
     let
       overlay = final: prev: {
+        bitte-ci = final.callPackage ./pkgs/bitte-ci { };
+
         nix = inputs.nix.packages.${prev.system}.nix;
+
         inclusive = inputs.inclusive.lib.inclusive;
-        nomad = inputs.bitte.legacyPackages.${prev.system}.nomad;
+
+        inherit (inputs.bitte.packages.${prev.system}) cue nomad;
 
         libgit2 = final.callPackage ./pkgs/libgit2 {
           inherit (prev.darwin.apple_sdk.frameworks) Security;
         };
-
-        bitte-ci = final.callPackage ./pkgs/bitte-ci { };
 
         crystal = final.callPackage ./pkgs/crystal {
           oldCrystal = prev.crystal;
@@ -54,13 +59,13 @@
           libatomic_ops = inputs.libatomic_ops;
         };
 
+        tests = final.callPackage ./tests { inherit inputs; };
+
         arion = inputs.arion.defaultPackage.${prev.system};
 
         reproxy = prev.callPackage ./pkgs/reproxy { };
 
         ngrok = prev.callPackage ./pkgs/ngrok { };
-
-        tests = final.callPackage ./tests { inherit inputs; };
 
         project = inputs.arion.lib.build {
           modules = [ ./arion-compose.nix ];
@@ -79,9 +84,10 @@
 
       legacyPackages.x86_64-linux = pkgs;
 
-      packages.x86_64-linux = { inherit (pkgs) bitte-ci bitte-ci-static; };
+      packages.x86_64-linux = pkgs.bitte-ci.passthru;
 
-      defaultPackage.x86_64-linux = self.packages.x86_64-linux.bitte-ci;
+      defaultPackage.x86_64-linux =
+        self.packages.x86_64-linux.bitte-ci.bitte-ci;
 
       devShell.x86_64-linux = pkgs.mkShell {
         DOCKER_HOST = "unix:///run/podman/podman.sock";
@@ -102,7 +108,7 @@
           ngrok
           kcov
 
-          inputs.bitte.packages.x86_64-linux.cue
+          cue
 
           crystal
           shards

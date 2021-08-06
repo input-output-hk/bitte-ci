@@ -184,7 +184,7 @@ module BitteCI
     def start_timeout(delay, signal)
       spawn do
         sleep delay
-        Log.error { "timeout #{delay}s reached, sending SIG#{signal} to process" }
+        @loki.log "timeout #{delay}s reached, sending SIG#{signal} to process"
         @timeout.send signal
       end
     end
