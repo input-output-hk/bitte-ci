@@ -39,13 +39,18 @@ module BitteCI
         IO.copy(body, file)
       end
 
+      if File.size(dest) > MAX_FILESIZE
+        File.delete(dest)
+        raise "File larger than #{MAX_FILESIZE.humanize}"
+      end
+
       # generating the digest from the file saves a lot of memory as we can
       # stream the request body to disk first.
       # Only drawback is when the hash doesn't match we have to clean up...
       final = Digest::SHA256.hexdigest &.file(dest)
 
       if hash != final
-        # File.delete(dest)
+        File.delete(dest)
         raise "body doesn't match sha256, got: #{final} and expected: #{hash}"
       end
 
