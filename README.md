@@ -6,6 +6,14 @@ A CI built for [Bitte](https://github.com/input-output-hk/bitte), but usable wit
 
 Projects are added automatically when Bitte CI receives a pull request from GitHub with the correct secret.
 
+These settings are required:
+
+![2021-08-06_18-02](https://user-images.githubusercontent.com/3507/128539489-d635e87f-8ced-4786-9e15-a5c4ac92fd7b.png)
+
+Also make sure to send pushes and PRs:
+
+![2021-08-06_18-03](https://user-images.githubusercontent.com/3507/128539509-893bfe29-4a9b-4c64-8b21-d553fa723bd5.png)
+
 ## Dependencies
 
 Bitte CI depends on some external services:
