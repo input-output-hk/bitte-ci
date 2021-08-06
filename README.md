@@ -1,8 +1,50 @@
 # Bitte CI
 
-A CI built for [Bitte](https://github.com/input-output-hk/bitte), but usable with any Nomad cluster.
+A CI built for [Bitte](https://github.com/input-output-hk/bitte),
+but potentially usable with any [Nomad](https://www.nomadproject.io/) cluster.
+
+This is basically a translator from GitHub PRs into Nomad jobs. It also comes
+with a built-in UI to keep track of the deployed jobs and view logs.
+Additionally the status of the PR will be updated.
+
+The runtime sandbox environment of a job can be declaratively specified using
+[Nix](https://nixos.org/) and its unstable
+[flakes](https://nixos.wiki/wiki/Flakes) feature.
+
+We strive to make life better for all developers, even if they don't know Nix,
+so the only thing you have to specify are the packages you would like to have
+in your environment.
 
 ## Adding a project
+
+### ci.cue
+
+Configuration for a project is specified using [CUE](https://cuelang.org/).
+The type definitions can be found in 
+[schema.cue](https://github.com/input-output-hk/bitte-ci/blob/main/cue/schema.cue).
+
+A minimal example could be:
+
+```
+ci: {
+  version: 1
+
+  steps: hello: {
+    command: ["bash", "-c", "hello -t"]
+    flakes: "github:NixOS/nixpkgs/nixos-21.05": ["bash", "hello"]
+  }
+}
+```
+
+This will provide you with an environment that includes
+[Bash](https://www.gnu.org/software/bash/) and
+[Hello](https://www.gnu.org/software/hello/manual/)
+
+You can find a list of currently more than 80k packages included in
+[nixpkgs](https://github.com/NixOS/nixpkgs) at
+[NixOS Search](https://search.nixos.org/packages).
+
+### GitHub hook
 
 Projects are added automatically when Bitte CI receives a pull request from GitHub with the correct secret.
 
