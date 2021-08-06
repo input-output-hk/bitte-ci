@@ -314,7 +314,10 @@ module BitteCI
     end
 
     def tasks
-      default = @job_config.ci.steps
+      default = @job_config.ci.steps.select do |name, step_config|
+        step_config.enable
+      end
+
       prepare_config.merge(default).map do |name, step_config|
         Task.new(@pr, name, step_config, @config, @loki_id)
       end
