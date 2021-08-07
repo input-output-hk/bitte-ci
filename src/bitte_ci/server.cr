@@ -161,29 +161,26 @@ module BitteCI
         )
 
         pr = build.pull_request
-        allocs = Allocation.query
+
+        alloc = Allocation.query
           .where { data.jsonb("Allocation.JobID") == pr.job_id }
+          .order_by(:created_at, :desc)
+          .first
 
-        # FIXME: this generates way too many queries.
-        outputs = allocs.map { |alloc|
-          alloc.outputs.select(:id, :size, :created_at, :alloc_id, :path, :mime, :sha256).to_a
-        }.select { |outputs|
-          outputs.any?
-        }.flatten
+        not_found unless alloc
 
-        failing_alloc = allocs
-          .to_a
-          .select { |alloc|
-            parsed = alloc.parsed
-            newer = parsed.allocation.create_time >= build.created_at
-            newer && alloc.parsed.allocation.task_states.try &.any? { |n, state|
-              state.events.any? { |event|
-                event.details["fails_task"]?
-              }
+        outputs = alloc.outputs
+          .select(:id, :size, :created_at, :path, :mime, :sha256).to_a
+
+        failing_alloc = alloc
+          .parsed
+          .allocation
+          .task_states
+          .try &.any? { |n, state|
+            state.events.any? { |event|
+              event.details["fails_task"]?
             }
           }
-          .sort_by { |alloc| alloc.created_at }
-          .last?
 
         render "src/views/build.ecr", "src/views/layout.ecr"
       end
