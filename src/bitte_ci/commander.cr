@@ -43,6 +43,9 @@ module BitteCI
       @[Option(help: "git checkout SHA")]
       property sha : String
 
+      @[Option(secret: true, help: "HMAC secret used for verifying output uploads")]
+      property artifact_secret : String
+
       # Everything below here is usually set by Nomad through environment variables
 
       @[Option(help: "Allocation ID of the task")]

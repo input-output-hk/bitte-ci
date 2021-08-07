@@ -31,7 +31,7 @@ module BitteCI
       body = body_io.gets_to_end
       signature = headers["X-Hub-Signature-256"][7..-1]
       digest = OpenSSL::HMAC.hexdigest(OpenSSL::Algorithm::SHA256, secret, body)
-      body if digest == signature
+      body if Crypto::Subtle.constant_time_compare(signature, digest)
     end
   end
 end

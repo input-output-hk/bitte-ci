@@ -61,6 +61,9 @@ module BitteCI
       @[Option(secret: true, help: "Nomad token used for job submission")]
       property nomad_token : String
 
+      @[Option(secret: true, help: "HMAC secret used for verifying output uploads")]
+      property artifact_secret : String
+
       def for_runner
         Runner::Config.new({
           "github_user_content_base_url" => github_user_content_base_url.to_s,
@@ -243,7 +246,6 @@ module BitteCI
         BitteCI::Trigger.handle(config, env)
       end
 
-      # TODO: add authentication/validation
       put "/api/v1/output" do |env|
         BitteCI::Artificer.handle(config, env)
       end

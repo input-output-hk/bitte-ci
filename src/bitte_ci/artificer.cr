@@ -1,5 +1,8 @@
 require "digest"
+require "openssl/hmac"
+require "crypto/subtle"
 require "file_utils"
+
 require "./simple_config"
 require "./magic"
 
@@ -11,12 +14,11 @@ module BitteCI
       Clear::SQL.init(config.postgres_url.to_s)
       Clear::Log.level = :debug
 
-      pp! env.request
-
       mime = env.request.headers["Content-Type"]
       nomad_alloc_id = env.request.query_params["nomad_alloc_id"]
       path = env.request.query_params["path"]
       hash = env.request.query_params["sha256"]
+      hmac = env.request.query_params["hmac512"]
 
       body = env.request.body
       unless body
@@ -29,7 +31,16 @@ module BitteCI
       end
 
       unless hash =~ /^[0-9a-f]{64}$/
-        raise "sha256 is not valid"
+        raise "sha256 is not valid, should be a hexadecimal string with length 64"
+      end
+
+      unless hmac =~ /^[0-9a-f]{128}$/
+        raise "hmac512 is not valid, should be a hexadecimal string with length 128"
+      end
+
+      verify = OpenSSL::HMAC.hexdigest(OpenSSL::Algorithm::SHA512, config.artifact_secret, hash)
+      unless Crypto::Subtle.constant_time_compare(hmac, verify)
+        raise "hmac512 doesn't match"
       end
 
       # this should spread the files out across a few thousand directories
@@ -75,12 +86,16 @@ module BitteCI
     end
 
     def self.upload(config, path)
+      sha256 = Digest::SHA256.hexdigest &.file(path)
+      hmac512 = OpenSSL::HMAC.hexdigest(OpenSSL::Algorithm::SHA512, config.artifact_secret, sha256)
+
       uri = config.public_url.dup
       uri.path = "/api/v1/output"
       uri.query = URI::Params.build { |form|
         form.add "nomad_alloc_id", config.nomad_alloc_id.to_s
         form.add "path", path
-        form.add "sha256", Digest::SHA256.hexdigest &.file(path)
+        form.add "sha256", sha256
+        form.add "hmac512", hmac512
       }
 
       res =
@@ -93,13 +108,11 @@ module BitteCI
         end
 
       case res.status
-      when HTTP::Status::CREATED
+      when HTTP::Status::OK
         res
       else
         Log.error &.emit("response", response: res.inspect)
-        Log.error {
-          "HTTP Error while trying to PUT output to #{uri} : #{res.status.to_i} #{res.status_message}"
-        }
+        raise "HTTP Error while trying to PUT output to #{uri} : #{res.status.to_i} #{res.status_message}"
       end
     end
 

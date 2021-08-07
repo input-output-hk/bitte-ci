@@ -51,6 +51,9 @@ module BitteCI
       @[Option(help: "URL to reach the bitte-ci server for output uploads")]
       property public_url : URI
 
+      @[Option(secret: true, help: "HMAC secret used for verifying output uploads")]
+      property artifact_secret : String
+
       def for_nomad_job
         NomadJob::Config.new(
           nomad_datacenters: nomad_datacenters.dup,
@@ -63,6 +66,7 @@ module BitteCI
           nomad_token: nomad_token,
           postgres_url: postgres_url,
           public_url: public_url,
+          artifact_secret: artifact_secret,
         )
       end
     end
@@ -178,7 +182,7 @@ module BitteCI
     struct Config
       getter nomad_datacenters, nomad_base_url, nomad_ssl_ca, nomad_ssl_cert,
         nomad_ssl_key, runner_flake, loki_base_url, nomad_token, postgres_url,
-        public_url
+        public_url, artifact_secret
 
       def initialize(
         @nomad_datacenters : Array(String),
@@ -190,7 +194,8 @@ module BitteCI
         @loki_base_url : URI,
         @nomad_token : String,
         @postgres_url : URI,
-        @public_url : URI
+        @public_url : URI,
+        @artifact_secret : String
       )
       end
     end
@@ -360,6 +365,7 @@ module BitteCI
               "--after", @config.after.to_json,
               "--outputs", @config.outputs.to_json,
               "--bitte-ci-id", @loki_id,
+              "--artifact-secret", @job_config.artifact_secret,
             ],
           },
 

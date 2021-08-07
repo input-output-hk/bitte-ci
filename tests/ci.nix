@@ -52,19 +52,25 @@ let
     };
   });
 
+  githubHookSecretFile =
+    builtins.toFile "secret" "oos0kahquaiNaiciz8MaeHohNgaejien";
+  githubTokenFile = builtins.toFile "github" "token";
+  nomadTokenFile = builtins.toFile "nomad" "secret";
+  artifactSecretFile = builtins.toFile "hmac" "something";
+
   bitteConfig = pkgs.writeText "bitte.json" (builtins.toJSON {
     public_url = "http://127.0.0.1:9494";
     postgres_url = "postgres://bitte_ci@127.0.0.1:5432/bitte_ci";
     github_user_content_base_url = "http://localhost:9090";
-    github_hook_secret_file =
-      builtins.toFile "secret" "oos0kahquaiNaiciz8MaeHohNgaejien";
+    github_hook_secret_file = githubHookSecretFile;
     nomad_base_url = "http://localhost:4646";
     loki_base_url = "http://127.0.0.1:3100";
-    github_token_file = builtins.toFile "github" "token";
+    github_token_file = githubTokenFile;
     github_user = "tester";
-    nomad_token_file = builtins.toFile "nomad" "secret";
+    nomad_token_file = nomadTokenFile;
     nomad_datacenters = "dc1";
     runner_flake = "path:/bitte-ci";
+    artifact_secret_file = artifactSecretFile;
   });
 
   queueJob = pkgs.writeShellScript "test.sh" ''
@@ -273,12 +279,10 @@ in pkgs.nixosTest {
           nomadUrl = "http://localhost:4646";
           publicUrl = "http://127.0.0.1:9494";
           lokiUrl = "http://127.0.0.1:3100";
-          githubHookSecretFile =
-            builtins.toFile "secret" "oos0kahquaiNaiciz8MaeHohNgaejien";
           githubUser = "tester";
-          githubTokenFile = builtins.toFile "github" "token";
-          nomadTokenFile = builtins.toFile "nomad" "secret";
           nomadDatacenters = [ "dc1" ];
+          inherit githubTokenFile nomadTokenFile githubHookSecretFile
+            artifactSecretFile;
         };
 
         nomad = {

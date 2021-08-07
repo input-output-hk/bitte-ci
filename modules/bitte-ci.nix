@@ -53,6 +53,8 @@ in {
         type = lib.types.nullOr lib.types.str;
         default = null;
       };
+
+      artifactSecretFile = lib.mkOption { type = lib.types.str; };
     };
   };
 
@@ -71,6 +73,7 @@ in {
       nomad-token-file = cfg.nomadTokenFile;
       nomad-datacenters = lib.concatStringsSep "," cfg.nomadDatacenters;
       runner-flake = cfg.runnerFlake;
+      artifact-secret-file = cfg.artifactSecretFile;
     };
 
     certs = lib.optionalAttrs (cfg.nomadSslCa != null) {
@@ -87,7 +90,7 @@ in {
       inherit (flags)
         postgres-url public-url github-user github-token-file loki-base-url
         github-hook-secret-file github-user-content-base-url nomad-base-url
-        nomad-token-file runner-flake nomad-datacenters;
+        nomad-token-file runner-flake nomad-datacenters artifact-secret-file;
     } // certs);
 
     migrateFlags = toFlags { inherit (flags) postgres-url; };
