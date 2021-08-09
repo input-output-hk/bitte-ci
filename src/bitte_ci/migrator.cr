@@ -7,26 +7,43 @@ module BitteCI
     struct Config
       include SimpleConfig::Configuration
 
+      def self.help
+        "Migrate the DB"
+      end
+
+      def self.command
+        "migrate"
+      end
+
       @[Option(help: "PostgreSQL URL e.g. postgres://postgres@127.0.0.1:54321/bitte_ci")]
       property postgres_url : URI
 
       @[Option(help: "migrate down this version number")]
       property down : Int64?
+
+      def run(log)
+        Migrator.new(log, self).run
+      end
     end
 
-    def self.run(config)
-      Log.info { "Starting migration" }
+    property log : ::Log
+    property config : Config
+
+    def initialize(@log, @config); end
+
+    def run
+      log.info { "Starting migration" }
       Clear::SQL.init(config.postgres_url.to_s)
 
       if down = config.down
-        Log.info { "Migrating down version #{down}" }
+        log.info { "Migrating down version #{down}" }
         Clear::Migration::Manager.instance.down(down)
       else
-        Log.info { "Migrating to latest version" }
+        log.info { "Migrating to latest version" }
         Clear::Migration::Manager.instance.apply_all
       end
 
-      Log.info { "Migration successful" }
+      log.info { "Migration successful" }
     end
   end
 end

@@ -55,46 +55,34 @@ in {
       };
 
       artifactSecretFile = lib.mkOption { type = lib.types.str; };
+
+      artifactDir = lib.mkOption {
+        type = lib.types.path;
+        default = "/var/lib/bitte-ci-server/artifacts";
+      };
+
+      _configJson = lib.mkOption {
+        type = lib.types.path;
+        default = builtins.toFile "config.json" (builtins.toJSON {
+          public_url = cfg.publicUrl;
+          postgres_url = cfg.postgresUrl;
+          github_user_content_base_url = cfg.githubUserContentUrl;
+          github_hook_secret_file = cfg.githubHookSecretFile;
+          nomad_base_url = cfg.nomadUrl;
+          loki_base_url = cfg.lokiUrl;
+          github_token_file = cfg.githubTokenFile;
+          github_user = cfg.githubUser;
+          nomad_token_file = cfg.nomadTokenFile;
+          nomad_datacenters = cfg.nomadDatacenters;
+          runner_flake = cfg.runnerFlake;
+          artifact_secret_file = cfg.artifactSecretFile;
+          artifact_dir = cfg.artifactDir;
+        });
+      };
     };
   };
 
-  config = lib.mkIf cfg.enable (let
-    toFlags = f: builtins.toString (lib.cli.toGNUCommandLine { } f);
-
-    flags = {
-      public-url = cfg.publicUrl;
-      postgres-url = cfg.postgresUrl;
-      github-user-content-base-url = cfg.githubUserContentUrl;
-      github-hook-secret-file = cfg.githubHookSecretFile;
-      nomad-base-url = cfg.nomadUrl;
-      loki-base-url = cfg.lokiUrl;
-      github-token-file = cfg.githubTokenFile;
-      github-user = cfg.githubUser;
-      nomad-token-file = cfg.nomadTokenFile;
-      nomad-datacenters = lib.concatStringsSep "," cfg.nomadDatacenters;
-      runner-flake = cfg.runnerFlake;
-      artifact-secret-file = cfg.artifactSecretFile;
-    };
-
-    certs = lib.optionalAttrs (cfg.nomadSslCa != null) {
-      nomad-ssl-ca = cfg.nomadSslCa;
-      nomad-ssl-key = cfg.nomadSslKey;
-      nomad-ssl-cert = cfg.nomadSslCert;
-    };
-
-    listenFlags = toFlags ({
-      inherit (flags) postgres-url nomad-base-url nomad-token-file public-url;
-    } // certs);
-
-    serverFlags = toFlags ({
-      inherit (flags)
-        postgres-url public-url github-user github-token-file loki-base-url
-        github-hook-secret-file github-user-content-base-url nomad-base-url
-        nomad-token-file runner-flake nomad-datacenters artifact-secret-file;
-    } // certs);
-
-    migrateFlags = toFlags { inherit (flags) postgres-url; };
-  in {
+  config = lib.mkIf cfg.enable {
     systemd.services.bitte-ci-server = {
       description = "Basic server and frontend for the Bitte CI";
       after =
@@ -105,7 +93,8 @@ in {
       # environment.KEMAL_ENV = "production";
 
       serviceConfig = {
-        ExecStart = "${cfg.package.server}/bin/bitte-ci-server ${serverFlags}";
+        ExecStart =
+          "${cfg.package.server}/bin/bitte-ci-server -c ${cfg._configJson}";
         Restart = "on-failure";
         RestartSec = "5s";
       };
@@ -121,7 +110,8 @@ in {
       ];
       wantedBy = [ "multi-user.target" ];
       serviceConfig = {
-        ExecStart = "${cfg.package.listen}/bin/bitte-ci-listen ${listenFlags}";
+        ExecStart =
+          "${cfg.package.listen}/bin/bitte-ci-listen -c ${cfg._configJson}";
         Restart = "on-failure";
         RestartSec = "5s";
       };
@@ -139,12 +129,12 @@ in {
 
       serviceConfig = {
         ExecStart =
-          "${cfg.package.migrate}/bin/bitte-ci-migrate ${migrateFlags}";
+          "${cfg.package.migrate}/bin/bitte-ci-migrate -c ${cfg._configJson}";
         Type = "oneshot";
         RemainAfterExit = true;
         Restart = "on-failure";
         RestartSec = "5s";
       };
     };
-  });
+  };
 }

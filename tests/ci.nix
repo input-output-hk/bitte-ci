@@ -68,7 +68,7 @@ let
     github_token_file = githubTokenFile;
     github_user = "tester";
     nomad_token_file = nomadTokenFile;
-    nomad_datacenters = "dc1";
+    nomad_datacenters = [ "dc1" ];
     runner_flake = "path:/bitte-ci";
     artifact_secret_file = artifactSecretFile;
   });

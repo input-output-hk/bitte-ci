@@ -13,6 +13,14 @@ module BitteCI
     class Config
       include SimpleConfig::Configuration
 
+      def self.help
+        "Prepare the repository in /alloc"
+      end
+
+      def self.command
+        "prepare"
+      end
+
       @[Option(help: "URL to clone the repo from")]
       property clone_url : URI
 
@@ -21,17 +29,19 @@ module BitteCI
 
       @[Option(help: "number of the PR")]
       property pr_number : UInt64
+
+      def run(log)
+        Preparator.new(log, self).run
+      end
     end
 
-    def self.run(config)
-      new(config).run
-    end
+    property log : Log
+    property config : Config
 
-    def initialize(@config : Config)
-    end
+    def initialize(@log : Log, @config : Config); end
 
     def run
-      Log.info {
+      log.info {
         "Using commit #{@config.sha} from repo #{@config.clone_url}"
       }
 

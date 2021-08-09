@@ -82,9 +82,12 @@
 
       nixosModules.bitte-ci = import ./modules/bitte-ci.nix;
 
-      legacyPackages.x86_64-linux = pkgs;
-
-      packages.x86_64-linux = pkgs.bitte-ci.passthru;
+      packages.x86_64-linux = {
+        # just for development
+        inherit (pkgs)
+          nix crystal libgit2 bdwgc tests arion reproxy ngrok project cacert
+          bash;
+      } // pkgs.bitte-ci.passthru;
 
       defaultPackage.x86_64-linux =
         self.packages.x86_64-linux.bitte-ci.bitte-ci;

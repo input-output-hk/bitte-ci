@@ -10,6 +10,14 @@ module BitteCI
     class Config
       include SimpleConfig::Configuration
 
+      def self.help
+        "Executor for steps within Nomad"
+      end
+
+      def self.command
+        "command"
+      end
+
       @[Option(help: "URL without path used to push logs to Loki")]
       property loki_base_url = URI.parse("http://127.0.0.1:4646")
 
@@ -97,14 +105,15 @@ module BitteCI
           "nomad_region"        => nomad_region,
         }.merge(labels)
       end
+
+      def run(log)
+        log.info { "Run Commander" }
+        Commander.new(self).run
+      end
     end
 
     REPO_ALLOC = "/alloc/repo"
     REPO_LOCAL = "/local/repo"
-
-    def self.run(config)
-      new(config).run
-    end
 
     def initialize(@config : Config)
       @loki = Loki.new(@config.loki_base_url, @config.to_labels)

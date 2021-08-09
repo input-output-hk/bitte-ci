@@ -15,6 +15,14 @@ module BitteCI
     struct Config
       include SimpleConfig::Configuration
 
+      def self.help
+        "queue the PR piped into stdin or passed as argument"
+      end
+
+      def self.command
+        "queue"
+      end
+
       @[Option(help: "Base URL e.g. https://raw.githubusercontent.com")]
       property github_user_content_base_url : URI = URI.parse("https://raw.githubusercontent.com")
 
@@ -69,26 +77,32 @@ module BitteCI
           artifact_secret: artifact_secret,
         )
       end
+
+      def run(log)
+        arg = ARGV[0]? ? File.read(ARGV[0]) : STDIN
+        Runner.run(log, self, arg)
+      end
     end
 
+    property log : Log
     property ci_cue : String
     property job_config : JobConfig
     property raw : String
 
-    def self.run(input : IO | String, config : Config)
+    def self.run(log : Log, config : Config, input : IO | String)
       raw = case input
             in IO
               input.gets_to_end
             in String
               input
             end
-      Log.info { "received PR" }
-      Log.info { raw }
+      log.info { "received PR" }
+      log.info { raw }
       hook = GithubHook.from_json(raw)
-      new(hook.pull_request, raw, config).run
+      new(log, hook.pull_request, raw, config).run
     end
 
-    def initialize(@pr : GithubHook::PullRequest, @raw : String, @config : Config)
+    def initialize(@log : Log, @pr : GithubHook::PullRequest, @raw : String, @config : Config)
       @ci_cue = fetch_ci_cue
       @job_config = export_job_config
     end

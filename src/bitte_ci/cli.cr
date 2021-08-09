@@ -2,14 +2,15 @@ require "./simple_config"
 require "log"
 
 module BitteCI
-  def self.parse_options(name, config_class)
+  def self.parse_options(*commands)
     return if ENV["BITTE_CI_SPEC"]?
 
     flags = {} of String => String
     config_file = "bitte_ci.json" if File.file?("bitte_ci.json")
+    chosen = nil
 
     op = OptionParser.new do |parser|
-      parser.banner = "Usage: bitte-ci-#{name}"
+      parser.banner = "Usage: bitte-ci"
 
       parser.invalid_option do |opt|
         puts parser
@@ -36,27 +37,44 @@ module BitteCI
         config_file = value
       end
 
-      config_class.option_parser(parser, flags)
+      commands.each do |config_type|
+        parser.on config_type.command, config_type.help do
+          chosen = config_type
+          config_type.option_parser(config_type.command, parser, flags)
+        end
+      end
     end
 
-    ::Log.builder.bind "clear.*", Log::Severity::Debug, Log::IOBackend.new
-    ::Log.for(name).info { "Starting" }
+    if commands.size == 1
+      ARGV.unshift commands.first.command
+    end
 
-    # We need to keep this around, but Kemal also tries to parse it
     argv = ARGV.dup
     op.parse(ARGV)
-    config = config_class.new(flags, config_file)
 
-    Signal::HUP.trap do
-      Log.info { "Received HUP" }
-      flags.clear
-      op.parse(argv.dup)
-      config.reload(flags, config_file)
+    if chosen
+      run(argv, op, flags, config_file, chosen.not_nil!)
+    else
+      puts op
+      exit 1
     end
-
-    yield(config)
   rescue e : OptionParser::MissingOption
     STDERR.puts e
     exit 1
+  end
+
+  def self.run(argv, parser : OptionParser, flags : Hash(String, String), config_file : String?, config_type)
+    log = ::Log.for(config_type.command)
+
+    config = config_type.new(flags, config_file)
+
+    Signal::HUP.trap do
+      log.info { "Received HUP, reloading configuration" }
+      flags.clear
+      parser.parse(argv.dup)
+      config.reload(log, flags, config_file)
+    end
+
+    config.run(log)
   end
 end

@@ -7,9 +7,17 @@ require "./simple_config"
 require "./line"
 
 module BitteCI
-  module Listener
+  class Listener
     struct Config
       include SimpleConfig::Configuration
+
+      def self.help
+        "Start nomad event listener"
+      end
+
+      def self.command
+        "listen"
+      end
 
       @[Option(help: "PostgreSQL URL e.g. postgres://postgres@127.0.0.1:54321/bitte_ci")]
       property postgres_url : URI
@@ -31,10 +39,19 @@ module BitteCI
 
       @[Option(help: "Base URL under which this server is reachable e.g. http://example.com")]
       property public_url : URI
+
+      def run(log)
+        Listener.new(log, self).run
+      end
     end
 
+    property log : Log
+    property config : Config
+
+    def initialize(@log, @config); end
+
     # TODO: refactor to use Clear
-    def self.listen(config : Config)
+    def run
       DB.open(config.postgres_url.to_s) do |db|
         index = 0i64
 
@@ -63,7 +80,7 @@ module BitteCI
       end
     end
 
-    def self.handle_line(db, line)
+    def handle_line(db, line)
       return if line == "{}"
       j = Line.from_json(line)
       j.events.each do |event|
@@ -74,7 +91,7 @@ module BitteCI
           eval_id = event.payload.allocation.eval_id
           status = event.payload.allocation.client_status
 
-          Log.info { "Updating allocation #{id} with #{status}" }
+          log.info { "Updating allocation #{id} with #{status}" }
 
           db.exec <<-SQL, id, eval_id, j.index, status, event.payload.to_json
             INSERT INTO allocations
@@ -104,11 +121,11 @@ module BitteCI
         end
       end
     rescue e : JSON::ParseException
-      Log.error &.emit("Couldn't parse line, stored as line.json", error: e.inspect)
+      log.error &.emit("Couldn't parse line, stored as line.json", error: e.inspect)
       File.write("line.json", line)
     end
 
-    def self.ssl_context(config)
+    def ssl_context(config)
       OpenSSL::SSL::Context::Client.from_hash({
         "ca"   => config.nomad_ssl_ca,
         "cert" => config.nomad_ssl_cert,

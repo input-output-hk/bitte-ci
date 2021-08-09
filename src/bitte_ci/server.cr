@@ -16,6 +16,14 @@ module BitteCI
     struct Config
       include SimpleConfig::Configuration
 
+      def self.help
+        "Start the webserver"
+      end
+
+      def self.command
+        "serve"
+      end
+
       @[Option(help: "Port to bind to")]
       property port : Int32 = 9494
 
@@ -69,15 +77,16 @@ module BitteCI
           "github_user_content_base_url" => github_user_content_base_url.to_s,
         }, nil)
       end
+
+      def run(log)
+        Server.new(log, self).run
+      end
     end
 
     property config : BitteCI::Server::Config
+    property log : Log
 
-    def self.start(config)
-      new(config).start
-    end
-
-    def initialize(@config)
+    def initialize(@log, @config : Config)
     end
 
     def jsonb_resolve(a, b)
@@ -110,7 +119,9 @@ module BitteCI
       ""
     end
 
-    def start
+    def run
+      Clear::SQL.init(config.postgres_url.to_s)
+
       control = ChannelControl.new(10)
       channels = [] of Channel(String)
       start_control(control, channels)
@@ -246,6 +257,10 @@ module BitteCI
       put "/api/v1/output" do |env|
         BitteCI::Artificer.handle(config, env)
       end
+
+      Kemal.config.port = config.port
+      Kemal.config.host_binding = config.host
+      Kemal.run
     end
 
     def start_pg_listen(config, channels)

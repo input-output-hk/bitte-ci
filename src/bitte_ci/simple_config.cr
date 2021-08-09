@@ -17,7 +17,7 @@ module SimpleConfig
           %env_key = {{ann[:env]}} || {{ivar.id.upcase.stringify}}
 
           %value = hash[%hash_key]?
-          %value = json[%hash_key]?.try(&.as_s) if %value.nil?
+          %value = json[%hash_key]? if %value.nil?
           %value = ENV[%env_key]? if %value.nil? && %env_key
           %value = {{ ivar.default_value }} if %value.nil?
 
@@ -34,6 +34,7 @@ module SimpleConfig
           {% else %}
             if %value.nil?
               raise(::SimpleConfig::Error.missing_flag(
+                {{@type.id}},
                 %hash_key,
                 {{ann[:short]}},
                 {{ann[:long]}} || {{ivar.id.tr("_", "-").stringify}},
@@ -64,11 +65,10 @@ module SimpleConfig
       end
     end
 
-    def reload(hash : Hash(String, String), file : String?)
-      Log.info { "Reloading configuration" }
+    def reload(log, hash : Hash(String, String), file : String?)
       json = load_json(file)
       prepare_secrets(hash, json)
-      reload_config(hash, json)
+      reload_config(log, hash, json)
     end
 
     def prepare_secrets(hash, json)
@@ -89,7 +89,7 @@ module SimpleConfig
     # TODO: remove duplication, make sure you keep this in sync with initialize
     # We can safely ignore changes to env variable and flags, so we only
     # consider changes to the config file(s).
-    def reload_config(hash, json)
+    def reload_config(log, hash, json)
       {% for ivar in @type.instance_vars %}
         {% ann = ivar.annotation(@type.constant("Option")) %}
         {% if ann %}
@@ -121,9 +121,9 @@ module SimpleConfig
 
           if %old != @{{ivar.id}}
             {% if ann[:secret] %}
-              Log.info { "Reloaded config {{ivar.id}}: <redacted> => <redacted>" }
+              log.info { "Reloaded config {{ivar.id}}: <redacted> => <redacted>" }
             {% else %}
-              Log.info { "Reloaded config {{ivar.id}}: #{%old} => #{@{{ivar.id}}}" }
+              log.info { "Reloaded config {{ivar.id}}: #{%old} => #{@{{ivar.id}}}" }
             {% end %}
           end
         {% end %}
@@ -151,7 +151,9 @@ module SimpleConfig
   end
 
   module OptionParserFlags
-    def option_parser(parser, config)
+    def option_parser(command, parser, config)
+      parser.banner = "Usage: bitte-ci #{command}"
+
       {% for ivar in @type.instance_vars %}
         {% ann = ivar.annotation(@type.constant("Option")) %}
         {% if ann %}
@@ -191,8 +193,8 @@ module SimpleConfig
   end
 
   class Error < ::Exception
-    def self.missing_flag(key : String, short : Char?, long : String?, env : String?)
-      notice = ["Missing value for the option '#{key}'."]
+    def self.missing_flag(type, key : String, short : Char?, long : String?, env : String?)
+      notice = ["Missing value for the #{type} option '#{key}'."]
       notice << "Please set it one of these ways:"
       notice << "in your config file with: '#{key}'"
       notice << "cli flag: '-#{short}'" if short
@@ -203,26 +205,66 @@ module SimpleConfig
   end
 end
 
+struct JSON::Any
+  def to_simple_option(k : String.class) : String
+    as_s
+  end
+
+  def to_simple_option(k : Array(String).class) : Array(String)
+    as_a.map(&.as_s)
+  rescue e : TypeCastError
+    pp! self
+    raise e
+  end
+
+  def to_simple_option(k : Hash(String, String).class) : Hash(String, String)
+    as_h.transform_values(&.as_s)
+  rescue e : TypeCastError
+    pp! self
+    raise e
+  end
+
+  def to_simple_option(k : UInt64.class) : UInt64
+    as_i64.to_u64
+  end
+
+  def to_simple_option(k : URI.class) : URI
+    URI.parse(as_s)
+  end
+
+  def to_simple_option(k : UUID.class) : UUID
+    UUID.new(as_s)
+  end
+
+  def to_simple_option(k : Int64.class) : Int64
+    as_i64
+  end
+
+  def to_simple_option(k : Int32.class) : Int32
+    as_i
+  end
+end
+
 class URI
-  def to_simple_option(k : URI.class)
+  def to_simple_option(k : URI.class) : URI
     self
   end
 end
 
 class String
-  def to_simple_option(k : Int32.class)
+  def to_simple_option(k : Int32.class) : Int32
     to_i32
   end
 
-  def to_simple_option(k : UInt32.class)
+  def to_simple_option(k : UInt32.class) : UInt32
     to_u32
   end
 
-  def to_simple_option(k : Int64.class)
+  def to_simple_option(k : Int64.class) : Int64
     to_i64
   end
 
-  def to_simple_option(k : Array(String).class)
+  def to_simple_option(k : Array(String).class) : Array(String)
     if self[0]? == '['
       Array(String).from_json(self)
     else
@@ -230,23 +272,23 @@ class String
     end
   end
 
-  def to_simple_option(k : String.class)
+  def to_simple_option(k : String.class) : String
     self
   end
 
-  def to_simple_option(k : URI.class)
+  def to_simple_option(k : URI.class) : URI
     URI.parse(self)
   end
 
-  def to_simple_option(k : UInt64.class)
+  def to_simple_option(k : UInt64.class) : UInt64
     to_u64
   end
 
-  def to_simple_option(k : UUID.class)
+  def to_simple_option(k : UUID.class) : UUID
     UUID.new(self)
   end
 
-  def to_simple_option(k : Hash(String, String).class)
+  def to_simple_option(k : Hash(String, String).class) : Hash(String, String)
     if self[0]? == '{'
       Hash(String, String).from_json(self)
     else

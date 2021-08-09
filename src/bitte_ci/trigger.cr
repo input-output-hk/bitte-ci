@@ -17,7 +17,7 @@ module BitteCI
       when "pull_request"
         body = verify_hmac(config.github_hook_secret, headers, body_io) if body_io
         if body
-          Runner.run(body, config.for_runner)
+          Runner.run(::Log.for("runner"), config.for_runner, body)
         else
           Log.error { "HMAC Signature doesn't match. Verify the github hook and secret configured in bitte-ci match!" }
         end

@@ -3,7 +3,7 @@ require "./time"
 require "./uuid"
 
 module BitteCI
-  module Listener
+  class Listener
     class Line
       include JSON::Serializable
 
