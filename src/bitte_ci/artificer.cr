@@ -44,7 +44,7 @@ module BitteCI
       end
 
       # this should spread the files out across a few thousand directories
-      dest = File.join("output", hash[0..5], hash)
+      dest = File.join(config.artifact_dir, hash[0..5], hash)
       FileUtils.mkdir_p(File.dirname(dest))
       File.open(dest, "w+") do |file|
         IO.copy(body, file)

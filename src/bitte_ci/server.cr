@@ -72,6 +72,9 @@ module BitteCI
       @[Option(secret: true, help: "HMAC secret used for verifying output uploads")]
       property artifact_secret : String
 
+      @[Option(help: "Directory used for storign output uploads (will be created if it doesn't exist)")]
+      property artifact_dir : String
+
       def for_runner
         Runner::Config.new({
           "github_user_content_base_url" => github_user_content_base_url.to_s,
@@ -244,7 +247,7 @@ module BitteCI
         if output
           env.response.headers["Content-Type"] = output.mime
           env.response.headers["Content-Disposition"] = %(attachment; filename="#{File.basename(output.path)}")
-          File.read(File.join("output", output.sha256[0..5], output.sha256))
+          File.read(File.join(config.artifact_dir, output.sha256[0..5], output.sha256))
         else
           halt env, status_code: 404, response: "Not Found"
         end
