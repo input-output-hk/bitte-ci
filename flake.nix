@@ -87,7 +87,7 @@
         inherit (pkgs)
           nix crystal libgit2 bdwgc tests arion reproxy ngrok project cacert
           bash;
-      } // pkgs.bitte-ci.passthru;
+      } // pkgs.bitte-ci;
 
       defaultPackage.x86_64-linux =
         self.packages.x86_64-linux.bitte-ci.bitte-ci;

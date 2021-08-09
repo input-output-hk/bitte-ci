@@ -23,8 +23,6 @@ in clang10Stdenv.mkDerivation {
 
   src = mkSrc (import (./. + "/input_${extraArgs.name}.nix"));
 
-  passthru = extraArgs.bitteCiPackages;
-
   LLVM_CONFIG = "${llvm_10}/bin/llvm-config";
 
   buildInputs = [ gmp openssl pcre libevent libyaml zlib file libgit2 libssh2 ];

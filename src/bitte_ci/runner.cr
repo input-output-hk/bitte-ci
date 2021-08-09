@@ -354,7 +354,7 @@ module BitteCI
 
       # combine the required dependencies for the runner.sh with
       def dependencies
-        deps = %w[cacert bitte-ci.command].map { |a| "#{@job_config.runner_flake}##{a}" }
+        deps = %w[cacert command-static].map { |a| "#{@job_config.runner_flake}##{a}" }
         original = @config.flakes.flat_map { |k, vs| vs.map { |v| "#{k}##{v}" } }
         (deps + original).uniq
       end
@@ -440,7 +440,7 @@ module BitteCI
       {
         "prepare" => JobConfig::Step.new(
           label: "Git checkout to /alloc/repo",
-          flakes: {@config.runner_flake.to_s => ["bitte-ci.prepare"]},
+          flakes: {@config.runner_flake.to_s => ["prepare-static"]},
           command: ["bitte-ci-prepare"],
           enable: true,
           vault: false,

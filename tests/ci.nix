@@ -12,7 +12,7 @@ let
       cd $out
       git init
       cp ${./ci.cue} ci.cue
-      cp ${testFlake} flake.nix
+      cp ${./flake.nix} flake.nix
       cp ${../flake.lock} flake.lock
       git add .
       git commit -m 'inaugural commit'
@@ -118,25 +118,6 @@ let
       | jq -c --arg uuid "$(echo "$job" | awk '/ID/ { print $3; exit }')" '.uuid = $uuid' \
       | websocat -B 1000000 ws://0.0.0.0:9494/ci/api/v1/socket \
       | jq
-  '';
-
-  testFlake = pkgs.writeText "flake.nix" ''
-    {
-      description = "Test";
-      inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05";
-      inputs.bitte-ci.url = "path:/bitte-ci";
-      outputs = { self, nixpkgs, ... }@inputs:
-        let
-          overlay = final: prev: {
-            bitte-ci = inputs.bitte-ci.packages.x86_64-linux.bitte-ci;
-          };
-
-          pkgs = import nixpkgs {
-            system = "x86_64-linux";
-            overlays = [ overlay ];
-          };
-        in { legacyPackages.x86_64-linux = pkgs; };
-    }
   '';
 
   fakeGithub = pkgs.writeText "github.rb" ''
@@ -383,7 +364,7 @@ in pkgs.nixosTest {
     ci.wait_for_open_port(9494)
 
     ci.log(ci.succeed("${bitteCiFlake}"))
-    ci.log(ci.succeed("nix build ${repo}#bitte-ci.prepare-static"))
+    ci.log(ci.succeed("nix build ${repo}#prepare-static"))
 
     ci.log(ci.succeed("${queueJob}"))
 

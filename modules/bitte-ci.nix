@@ -6,8 +6,12 @@ in {
       enable = lib.mkEnableOption "Enable Bitte CI";
 
       package = lib.mkOption {
-        type = lib.types.package;
-        default = pkgs.bitte-ci;
+        type = lib.types.attrsOf lib.types.package;
+        default = {
+          server = pkgs.bitte-ci.server-static;
+          listen = pkgs.bitte-ci.listen-static;
+          migrate = pkgs.bitte-ci.migrate-static;
+        };
       };
 
       port = lib.mkOption {
