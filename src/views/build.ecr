@@ -1,4 +1,4 @@
-<div>
+<div class="container-xl">
   <div>
     <a href="/pull_request/<%= build.pr_id %>">
       Back to Pull Request
@@ -28,62 +28,62 @@
       <% end %>
     </tbody>
   </table>
+</div>
 
-  <% if failing_alloc %>
-    <hr/>
-    <h3>Allocation Errors</h3>
+<% if failing_alloc %>
+  <hr/>
+  <h3>Allocation Errors</h3>
 
-    <% a = alloc.parsed.allocation %>
-    <div>Description: <%= h a.client_description %></div>
-    <div>Client Status: <%= h a.client_status %></div>
-    <div>Created: <%= a.create_time %></div>
-    <% a.task_states.try &.each do |name, state| %>
-      <% if state.events.any?{|event| event.details["fails_task"]? } %>
-        <h4><%= h name %></h4>
-        <div>State: <%= h state.state %></div>
-        <div>Finished at: <%= state.finished_at %></div>
-        <table class="table table-borderless table-sm">
-          <tbody>
-            <% state.events.each do |event| %>
-              <tr>
-                <td class="line"><%= h event %></td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      <% end %>
+  <% a = alloc.parsed.allocation %>
+  <div>Description: <%= h a.client_description %></div>
+  <div>Client Status: <%= h a.client_status %></div>
+  <div>Created: <%= a.create_time %></div>
+  <% a.task_states.try &.each do |name, state| %>
+    <% if state.events.any?{|event| event.details["fails_task"]? } %>
+      <h4><%= h name %></h4>
+      <div>State: <%= h state.state %></div>
+      <div>Finished at: <%= state.finished_at %></div>
+      <table class="table table-borderless table-sm">
+        <tbody>
+          <% state.events.each do |event| %>
+            <tr>
+              <td class="line"><%= h event %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
     <% end %>
   <% end %>
+<% end %>
 
-  <hr/>
-  <h3>Logs</h3>
+<hr/>
+<h3>Logs</h3>
 
-  <ul class="nav nav-tabs" id="myTab" role="tablist">
-    <% logs.each do |alloc_id, steps| %>
-      <% steps.each do |step_name, step | %>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="<%= h "#{step_name}-tab" %>" data-bs-toggle="tab" data-bs-target="#<%= h step_name %>" type="button" role="tab" aria-controls="<%= h step_name %>" aria-selected="true"><%= h step_name %></button>
-        </li>
-      <% end %>
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+  <% logs.each do |alloc_id, steps| %>
+    <% steps.each do |step_name, step | %>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="<%= h "#{step_name}-tab" %>" data-bs-toggle="tab" data-bs-target="#<%= h step_name %>" type="button" role="tab" aria-controls="<%= h step_name %>" aria-selected="true"><%= h step_name %></button>
+      </li>
     <% end %>
-  </ul>
+  <% end %>
+</ul>
 
-  <div class="tab-content" id="myTabContent">
-    <% logs.each do |alloc_id, steps| %>
-      <% steps.each do |step_name, step | %>
-        <div class="tab-pane fade" id="<%= h step_name %>">
-          <table class="table table-borderless table-sm">
-            <%- step.each do |step| -%>
-              <tr>
-                <td class="time"><%= step[:time].to_s("%T.%L") %></td>
-                <td class="line"><%= h step[:line].rstrip %></td>
-              </tr>
-            <% end %>
-          </table>
-        </div>
-      <% end %>
+<div class="tab-content" id="myTabContent">
+  <% logs.each do |alloc_id, steps| %>
+    <% steps.each do |step_name, step | %>
+      <div class="tab-pane fade" id="<%= h step_name %>">
+        <table class="table table-borderless table-sm">
+          <%- step.each do |step| -%>
+            <tr>
+              <td class="time"><%= step[:time].to_s("%T.%L") %></td>
+              <td class="line"><%= h step[:line].rstrip %></td>
+            </tr>
+          <% end %>
+        </table>
+      </div>
     <% end %>
-  </div>
+  <% end %>
 </div>
 
 <style>
@@ -107,6 +107,7 @@
 
 <script>
   var triggerTabList = [].slice.call(document.querySelectorAll('#myTab button'))
+  var first = true
   triggerTabList.forEach(function (triggerEl) {
     var tabTrigger = new bootstrap.Tab(triggerEl)
 
@@ -116,8 +117,10 @@
       tabTrigger.show()
     })
 
-    if (document.location.hash === triggerEl.dataset.bsTarget) {
+    if (first || (document.location.hash === triggerEl.dataset.bsTarget)) {
       tabTrigger.show()
     }
+
+    first = false
   })
 </script>

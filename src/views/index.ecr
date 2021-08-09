@@ -1,44 +1,46 @@
-<table class="table table-sm">
-  <thead>
-    <tr>
-      <th>Org</th>
-      <th>Repo</th>
-      <th>#</th>
-      <th>Commit</th>
-      <th>Branch</th>
-      <th>Title</th>
-      <th>Created</th>
-      <th>Links</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% prs.each do |pr| %>
+<div class="container">
+  <table class="table table-sm">
+    <thead>
       <tr>
-        <td>
-          <a href="<%= pr.org_url %>">
-            <img src="<%= pr.org_avatar %>" style="height: 3em;">
-          </a>
-        </td>
-        <td>
-          <a href="<%= pr.base_url  %>">
-            <%= pr.base_name  %>
-          </a>
-        </td>
-        <td>
-          <a href="<%= pr.url %>">
-            <%= pr.number %>
-          </a>
-        </td>
-        <td>
-          <a href="<%= pr.commit_url %>"><%= pr.sha_short %></a>
-        </td>
-        <td>
-          <a href="<%= pr.branch_url %>"><%= pr.ref %></a>
-        </td>
-        <td><%= pr.title %></td>
-        <td><%= pr.created_at_relative %></td>
-        <td><a href="/pull_request/<%= pr.id %>">Builds</a></td>
+        <th>Org</th>
+        <th>Repo</th>
+        <th>#</th>
+        <th>Commit</th>
+        <th>Branch</th>
+        <th>Title</th>
+        <th>Created</th>
+        <th>Links</th>
       </tr>
-    <% end %>
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      <% prs.each do |pr| %>
+        <tr>
+          <td>
+            <a href="<%= pr.org_url %>">
+              <img src="<%= pr.org_avatar %>" style="height: 3em;">
+            </a>
+          </td>
+          <td>
+            <a href="<%= pr.base_url  %>">
+              <%= pr.base_name  %>
+            </a>
+          </td>
+          <td>
+            <a href="<%= pr.url %>">
+              <%= pr.number %>
+            </a>
+          </td>
+          <td>
+            <a href="<%= pr.commit_url %>"><%= pr.sha_short %></a>
+          </td>
+          <td>
+            <a href="<%= pr.branch_url %>"><%= pr.ref %></a>
+          </td>
+          <td><%= pr.title %></td>
+          <td><%= pr.created_at_relative %></td>
+          <td><a href="/pull_request/<%= pr.id %>">Builds</a></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

@@ -1,4 +1,8 @@
-<div class="coontainer">
+<style>
+  .info { white-space: nowrap; }
+</style>
+
+<div class="container-xxl">
   <div class="row">
     <h3 class="col">
       <%= pr.title %>
@@ -6,34 +10,33 @@
   </div>
 
   <div class="row mt-5 mb-5">
-    <div class="col col-sm-6">
+    <div class="col info">
       Commit: <%= pr.sha %>
-
-      <a href="<%= pr.commit_url %>">
+      <a href="<%= pr.commit_url %>" target="_blank">
         <i class="bi bi-box-arrow-up-right"></i>
       </a>
     </div>
 
-    <div class="col col-sm-3">
+    <div class="col info">
       Pull Request: <%= pr.number %>
 
-      <a href="<%= pr.url %>">
+      <a href="<%= pr.url %>" target="_blank">
         <i class="bi bi-box-arrow-up-right"></i>
       </a>
     </div>
 
-    <div class="col col-sm-3">
+    <div class="col info">
       Branch: <%= pr.ref %>
 
-      <a href="<%= pr.branch_url %>">
+      <a href="<%= pr.branch_url %>" target="_blank">
         <i class="bi bi-box-arrow-up-right"></i>
       </a>
     </div>
 
-    <div class="col col-sm-2">
+    <div class="col info">
       User: <%= pr.user_login %>
 
-      <a href="<%= pr.user_url %>">
+      <a href="<%= pr.user_url %>" target="_blank">
         <i class="bi bi-box-arrow-up-right"></i>
       </a>
     </div>

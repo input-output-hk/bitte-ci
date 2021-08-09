@@ -146,7 +146,12 @@ module BitteCI
       end
 
       get "/about" do
-        content = Markd.to_html({{ read_file "README.md" }})
+        markdown = Markd.to_html({{ read_file "README.md" }})
+        content = <<-HTML
+          <div class="about container">
+            #{markdown}
+          </div>
+        HTML
         title = "About"
         render "src/views/layout.ecr"
       end
