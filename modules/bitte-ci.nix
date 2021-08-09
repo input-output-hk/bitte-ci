@@ -10,6 +10,16 @@ in {
         default = pkgs.bitte-ci;
       };
 
+      port = lib.mkOption {
+        type = lib.types.port;
+        default = 9494;
+      };
+
+      host = lib.mkOption {
+        type = lib.types.str;
+        default = "127.0.0.1";
+      };
+
       publicUrl = lib.mkOption { type = lib.types.str; };
 
       postgresUrl = lib.mkOption { type = lib.types.str; };
@@ -64,6 +74,8 @@ in {
       _configJson = lib.mkOption {
         type = lib.types.path;
         default = builtins.toFile "config.json" (builtins.toJSON {
+          host = cfg.host;
+          port = cfg.port;
           public_url = cfg.publicUrl;
           postgres_url = cfg.postgresUrl;
           github_user_content_base_url = cfg.githubUserContentUrl;
