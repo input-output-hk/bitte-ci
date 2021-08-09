@@ -19,7 +19,7 @@ module SimpleConfig
           %value = hash[%hash_key]?
           %value = json[%hash_key]? if %value.nil?
           %value = ENV[%env_key]? if %value.nil? && %env_key
-          %value = {{ ivar.default_value }} if %value.nil?
+          %value = {{ivar.default_value}} if %value.nil?
 
           {% if ivar.type.nilable? %}
             if %value.nil?
@@ -48,7 +48,7 @@ module SimpleConfig
                 @{{ivar.id}} = show_detailed_error({{ivar.stringify}}, %value.inspect) {
                   %value.to_simple_option(
                     {{ivar.type}}
-                  )
+                  ).not_nil!
                 }
               end
             end
@@ -206,42 +206,38 @@ module SimpleConfig
 end
 
 struct JSON::Any
-  def to_simple_option(k : String.class) : String
-    as_s
+  def to_simple_option(k : String.class) : String?
+    as_s?
   end
 
-  def to_simple_option(k : Array(String).class) : Array(String)
-    as_a.map(&.as_s)
-  rescue e : TypeCastError
-    pp! self
-    raise e
+  def to_simple_option(k : Array(String).class) : Array(String)?
+    as_a?.try &.map(&.as_s)
   end
 
-  def to_simple_option(k : Hash(String, String).class) : Hash(String, String)
-    as_h.transform_values(&.as_s)
-  rescue e : TypeCastError
-    pp! self
-    raise e
+  def to_simple_option(k : Hash(String, String).class) : Hash(String, String)?
+    as_h?.try &.transform_values(&.as_s)
   end
 
-  def to_simple_option(k : UInt64.class) : UInt64
-    as_i64.to_u64
+  def to_simple_option(k : UInt64.class) : UInt64?
+    as_i64?.try &.to_u64
   end
 
-  def to_simple_option(k : URI.class) : URI
-    URI.parse(as_s)
+  def to_simple_option(k : URI.class) : URI?
+    s = as_s?
+    URI.parse(s) if s
   end
 
-  def to_simple_option(k : UUID.class) : UUID
-    UUID.new(as_s)
+  def to_simple_option(k : UUID.class) : UUID?
+    s = as_s?
+    UUID.new(s) if s
   end
 
-  def to_simple_option(k : Int64.class) : Int64
-    as_i64
+  def to_simple_option(k : Int64.class) : Int64?
+    as_i64?
   end
 
-  def to_simple_option(k : Int32.class) : Int32
-    as_i
+  def to_simple_option(k : Int32.class) : Int32?
+    as_i?
   end
 end
 

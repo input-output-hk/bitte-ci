@@ -89,6 +89,9 @@ in {
           runner_flake = cfg.runnerFlake;
           artifact_secret_file = cfg.artifactSecretFile;
           artifact_dir = cfg.artifactDir;
+          nomad_ssl_ca = cfg.nomadSslCa;
+          nomad_ssl_key = cfg.nomadSslKey;
+          nomad_ssl_cert = cfg.nomadSslCert;
         });
       };
     };
