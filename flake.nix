@@ -90,7 +90,7 @@
       } // pkgs.bitte-ci;
 
       defaultPackage.x86_64-linux =
-        self.packages.x86_64-linux.bitte-ci.bitte-ci;
+        self.packages.x86_64-linux.bitte-ci;
 
       devShell.x86_64-linux = pkgs.mkShell {
         DOCKER_HOST = "unix:///run/podman/podman.sock";
