@@ -1,6 +1,9 @@
 {
   description = "Flake for Bitte CI";
 
+  nixConfig.extra-substituters = "https://hydra.iohk.io";
+  nixConfig.extra-trusted-public-keys = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05";
     arion.url = "github:hercules-ci/arion";
