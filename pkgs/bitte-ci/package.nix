@@ -33,7 +33,10 @@ in clang10Stdenv.mkDerivation {
     ln -s ${crystalLib} lib
     mkdir -p $out/bin
 
-    crystal build ${extraArgs.main} \
+    mkdir -p .cache/crystal
+    export CRYSTAL_CACHE_DIR=.cache/crystal
+
+    crystal build --verbose ${extraArgs.main} \
       -o "$out/bin/${pname}" \
       --link-flags "-L${bdwgc}/lib" \
       ${builtins.concatStringsSep " " crystalBuildFlags}
