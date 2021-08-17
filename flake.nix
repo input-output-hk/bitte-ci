@@ -115,7 +115,7 @@
         env = [
             {
               name = "DOCKER_HOST";
-              value = "unix:///run/podman/podman.sock";
+              eval = "$([[ -S /run/podman/podman.sock ]] && echo 'unix:///run/podman/podman.sock' || echo 'unix:///run/docker.sock')";
             }
             {
               name = "CRYSTAL_LIBRARY_PATH"; # shard build compat, prefer nix build
