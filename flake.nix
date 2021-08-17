@@ -89,6 +89,8 @@
           bash;
       } // pkgs.bitte-ci;
 
+      legacyPackages.x86_64-linux = pkgs;
+
       defaultPackage.x86_64-linux =
         self.packages.x86_64-linux.bitte-ci;
 

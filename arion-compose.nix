@@ -1,4 +1,4 @@
-{ pkgs, ... }: {
+{ pkgs, lib, ... }: {
   config.services = {
     loki = let
       config = builtins.toFile "loki.json" (builtins.toJSON {
