@@ -12,6 +12,7 @@
 
     # requires this PR https://github.com/NixOS/nix/pull/5082
     nix.url = "github:NixOS/nix";
+    devshell.url = "github:numtide/devshell";
 
     nomad-src = {
       url = "github:input-output-hk/nomad/release-1.1.2";
@@ -78,7 +79,7 @@
 
       pkgs = import inputs.nixpkgs {
         system = "x86_64-linux";
-        overlays = [ overlay ];
+        overlays = [ overlay inputs.devshell.overlay ];
       };
     in {
       inherit inputs;
@@ -97,18 +98,85 @@
       defaultPackage.x86_64-linux =
         self.packages.x86_64-linux.bitte-ci;
 
-      devShell.x86_64-linux = pkgs.mkShell {
-        DOCKER_HOST = "unix:///run/podman/podman.sock";
+      devShell.x86_64-linux = let
+        withCategory = category: attrset: attrset // { inherit category; };
+        main = withCategory "main";
+        maintenance = withCategory "maintenance";
+        run = withCategory "run";
+      in pkgs.devshell.mkShell {
+        name = "bitte-ci";
+        env = [
+            {
+              name = "DOCKER_HOST";
+              value = "unix:///run/podman/podman.sock";
+            }
+            {
+              name = "GITHUB_TOKEN";
+              eval = "$(awk '/github.com/ {print $6;exit}' ~/.netrc)";
+            }
+            {
+              name = "BITTE_CI_POSTGRES_URL";
+              value = "postgres://postgres@127.0.0.1/bitte_ci";
+            }
+        ];
 
-        # requires https://github.com/NixOS/nix/pull/4983
-        # BITTE_CI_POSTGRES_URL = "postgres://postgres@127.0.0.1/bitte_ci";
+        # tempfix: remove when merged https://github.com/numtide/devshell/pull/123
+        devshell.startup.load_profiles = pkgs.lib.mkForce (pkgs.lib.noDepEntry ''
+          # PATH is devshell's exorbitant privilige:
+          # fence against its pollution
+          _PATH=''${PATH}
+          # Load installed profiles
+          for file in "$DEVSHELL_DIR/etc/profile.d/"*.sh; do
+            # If that folder doesn't exist, bash loves to return the whole glob
+            [[ -f "$file" ]] && source "$file"
+          done
+          # Exert exorbitant privilige and leave no trace
+          export PATH=''${_PATH}
+          unset _PATH
+        '');
 
-        shellHook = ''
-          export GITHUB_TOKEN="$(awk '/github.com/ {print $6;exit}' ~/.netrc)"
-        '';
+        commands = [
+          {
+            name = "fmt";
+            help = "Check Nix formatting";
+            command = "nixpkgs-fmt \${@} $DEVSHELL_ROOT";
+          }
+          {
+            name = "evalnix";
+            help = "Check Nix parsing";
+            command = "fd --extension nix --exec nix-instantiate --parse --quiet {} >/dev/null";
+          }
+          (main {
+            package = pkgs.crystal; # TODO: missing meta.description
+          })
+          (main {
+            package = pkgs.crystal2nix;
+          })
+          (main {
+            package = pkgs.cue;
+          })
+          (main {
+            package = pkgs.arion;
+          })
+          (maintenance {
+            name = "deps";
+            help = "Do stuff with deps(?)"; # TODO
+            command = "${./scripts/deps_new.cr}";
+          })
+          (run {
+            name = "services";
+            help = "Run the docker services like postgres";
+            command = "arion -f $DEVSHELL_ROOT/arion-compose.nix -p $DEVSHELL_ROOT/arion-pkgs.nix up";
+          })
+          (run {
+            name = "launch-nomad";
+            help = "Launch nomad (requires elevation)";
+            command = "sudo -E ${pkgs.nomad}/bin/nomad agent -dev -config $DEVSHELL_ROOT/agent.hcl";
+          })
+        ];
 
-        buildInputs = with pkgs; [
-          pkgs.arion
+        packages = with pkgs; [
+          arion
           websocat
           grafana-loki
           nomad
@@ -116,11 +184,6 @@
           ngrok
           kcov
 
-          cue
-
-          crystal
-          shards
-          crystal2nix
           openssl
           pkg-config
           gmp.dev
@@ -131,6 +194,9 @@
           file
           libgit2
           libssh2
+
+          nixpkgs-fmt
+          nix
         ];
       };
     };
