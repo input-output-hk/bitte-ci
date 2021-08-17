@@ -126,7 +126,7 @@
               eval = "$(awk '/github.com/ {print $6;exit}' ~/.netrc)";
             }
             {
-              name = "BITTE_CI_POSTGRES_URL";
+              name = "POSTGRES_URL";
               value = "postgres://postgres@127.0.0.1/bitte_ci";
             }
         ];
@@ -175,7 +175,7 @@
             command = "${./scripts/deps_new.cr}";
           })
           (run {
-            name = "services";
+            name = "launch-services";
             help = "Run the docker services like postgres";
             command = "arion -f $DEVSHELL_ROOT/arion-compose.nix -p $DEVSHELL_ROOT/arion-pkgs.nix up";
           })

@@ -74,15 +74,21 @@ Or Crystal:
 
     ❯ shards build
 
-For development, you can start PostgreSQL and Loki using `arion up`.
-Nomad requires elevated permissions, so start it separately with:
+## Develop
+For development, you can enter the devshell:
 
-    ❯ sudo nomad agent -dev -config agent.hcl
+    ❯ nix develop
 
-Then run the bitte-ci listener and server:
+Start PostgreSQL and Loki.
+Nomad requires elevated permissions, so start it separately.
 
-    ❯ bitte-ci server
-    ❯ bitte-ci listen
+    [bitte-ci] ❯ lauch-services # arion up
+    [bitte-ci] ❯ lauch-nomad # sudo nomad agent -dev -config agent.hcl
+
+Then, after `nix build`, run the bitte-ci listener and server:
+
+    ❯ ./result/bin/bitte-ci serve
+    ❯ ./result/bin/bitte-ci listen
 
 ## Configuration
 
@@ -105,7 +111,7 @@ Consider the following equivalent examples:
     ❯ bitte-ci server
 
 
-In order to handle ease secrets handling, Bitte CI also supports loading
+In order to ease secrets handling, Bitte CI also supports loading
 sensitive options from files.
 This is in particular important when you want to rotate your secrets without
 restarting the server.
