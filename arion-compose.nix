@@ -94,6 +94,12 @@
         listen_addresses = '0.0.0.0'
         max_locks_per_transaction = 1024
       '';
+      initsql = pkgs.writeText "init.sql" ''
+        CREATE DATABASE bitte_ci;
+        CREATE USER bitte_ci;
+        GRANT ALL PRIVILEGES ON DATABASE bitte_ci to bitte_ci;
+        ALTER USER bitte_ci WITH SUPERUSER;
+      '';
     in {
       service.useHostStore = true;
       service.command = [
@@ -113,6 +119,9 @@
 
           if [ ! -s "$PGDATA/PG_VERSION" ]; then
             su - postgres -c "${pkgs.postgresql}/bin/initdb -D '$PGDATA'"
+            su - postgres -c "${pkgs.postgresql}/bin/pg_ctl -D '$PGDATA' -o \"-c listen_addresses=${"''"} -p 5432\" -w start"
+            su - postgres -c "${pkgs.postgresql}/bin/psql -v ON_ERROR_STOP=1 --username postgres --no-password -f ${initsql}"
+            su - postgres -c "${pkgs.postgresql}/bin/pg_ctl -D '$PGDATA' -m fast -w stop"
           fi
 
           ln -sfn ${pgconf} "$PGDATA/postgresql.conf"
