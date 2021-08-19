@@ -172,8 +172,8 @@
         commands = [
           {
             name = "fmt";
-            help = "Check Nix formatting";
-            command = "nixpkgs-fmt \${@} $DEVSHELL_ROOT";
+            help = "Fix Nix formatting";
+            command = "nixfmt $(fd $DEVSHELL_ROOT)";
           }
           {
             name = "evalnix";
@@ -204,7 +204,7 @@
           })
           (run {
             name = "launch-nomad";
-            help = "Launch nomad (requires elevation)";
+            help = "Launch nomad (will run sudo)";
             command = "sudo -E ${pkgs.nomad}/bin/nomad agent -dev -config $DEVSHELL_ROOT/agent.hcl";
           })
         ];
@@ -219,8 +219,9 @@
           kcov
 
           pkg-config
+          fd
 
-          nixpkgs-fmt
+          nixfmt
           nix
         ] ++ pkgs.bitte-ci.bitte-ci.buildInputs;
       };
