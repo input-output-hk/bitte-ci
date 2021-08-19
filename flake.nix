@@ -228,7 +228,7 @@
             name = "launch-nomad";
             help = "Launch nomad (will run sudo)";
             command =
-              "sudo -E ${pkgs.nomad}/bin/nomad agent -dev -config $DEVSHELL_ROOT/agent.hcl";
+              "sudo -E --preserve-env=PATH ${pkgs.nomad}/bin/nomad agent -dev -config $DEVSHELL_ROOT/agent.hcl";
           })
         ];
 
