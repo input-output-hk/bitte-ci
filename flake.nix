@@ -222,7 +222,7 @@
 
           nixpkgs-fmt
           nix
-        ];
+        ] ++ pkgs.bitte-ci.bitte-ci.buildInputs;
       };
     };
 }
