@@ -125,9 +125,43 @@
               name = "GITHUB_TOKEN";
               eval = "$(awk '/github.com/ {print $6;exit}' ~/.netrc)";
             }
+            # bitte-ci cofig evironment
+            # TODO: prefix with BITTE_CI_
+            {
+              name = "PUBLIC_URL";
+              value = "http://127.0.0.1:9494";
+            }
             {
               name = "POSTGRES_URL";
-              value = "postgres://postgres@127.0.0.1/bitte_ci";
+              value = "postgres://postgres@127.0.0.1:5432/bitte_ci";
+            }
+            {
+              name = "NOMAD_BASE_URL";
+              value = "http://127.0.0.1:4646";
+            }
+            {
+              name = "LOKI_BASE_URL";
+              value = "http://127.0.0.1:3100";
+            }
+            {
+              name = "NOMAD_DATACENTERS";
+              value = "dc1";
+            }
+            {
+              name = "GITHUB_USER_CONTENT_BASE_URL";
+              value = "https://raw.githubusercontent.com";
+            }
+            {
+              name = "NOMAD_TOKEN";
+              value = "snakeoil";
+            }
+            {
+              name = "ARTIFACT_SECRET";
+              value = "snakeoil";
+            }
+            {
+              name = "ARTIFACT_DIR";
+              eval = "$(mkdir $DEVSHELL_ROOT/.artifacts && echo '.artifacts')";
             }
         ];
 
