@@ -150,7 +150,7 @@
             }
             {
               name = "ARTIFACT_DIR";
-              eval = "$(mkdir $DEVSHELL_ROOT/.artifacts && echo '.artifacts')";
+              eval = "$(mkdir -p $DEVSHELL_ROOT/.artifacts && echo '.artifacts')";
             }
         ];
 
