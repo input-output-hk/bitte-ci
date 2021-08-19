@@ -206,38 +206,38 @@ module SimpleConfig
 end
 
 struct JSON::Any
-  def to_simple_option(k : String.class) : String?
-    as_s?
+  def to_simple_option(k : String.class) : String
+    as_s? || raise "Couldn't parse #{inspect} as #{k}"
   end
 
-  def to_simple_option(k : Array(String).class) : Array(String)?
-    as_a?.try &.map(&.as_s)
+  def to_simple_option(k : Array(String).class) : Array(String)
+    as_a?.try &.map(&.as_s) || raise "Couldn't parse #{inspect} as #{k}"
   end
 
-  def to_simple_option(k : Hash(String, String).class) : Hash(String, String)?
-    as_h?.try &.transform_values(&.as_s)
+  def to_simple_option(k : Hash(String, String).class) : Hash(String, String)
+    as_h?.try &.transform_values(&.as_s) || raise "Couldn't parse #{inspect} as #{k}"
   end
 
-  def to_simple_option(k : UInt64.class) : UInt64?
-    as_i64?.try &.to_u64
+  def to_simple_option(k : UInt64.class) : UInt64
+    as_i64?.try &.to_u64 || raise "Couldn't parse #{inspect} as #{k}"
   end
 
-  def to_simple_option(k : URI.class) : URI?
-    s = as_s?
-    URI.parse(s) if s
+  def to_simple_option(k : URI.class) : URI
+    s = as_s? || raise "Couldn't parse #{inspect} as #{k}"
+    (URI.parse(s) if s) || raise "Couldn't parse #{inspect} as #{k}"
   end
 
-  def to_simple_option(k : UUID.class) : UUID?
-    s = as_s?
-    UUID.new(s) if s
+  def to_simple_option(k : UUID.class) : UUID
+    s = as_s? || raise "Couldn't parse #{inspect} as #{k}"
+    (UUID.new(s) if s) || raise "Couldn't parse #{inspect} as #{k}"
   end
 
-  def to_simple_option(k : Int64.class) : Int64?
-    as_i64?
+  def to_simple_option(k : Int64.class) : Int64
+    as_i64? || raise "Couldn't parse #{inspect} as #{k}"
   end
 
-  def to_simple_option(k : Int32.class) : Int32?
-    as_i?
+  def to_simple_option(k : Int32.class) : Int32
+    as_i? || raise "Couldn't parse #{inspect} as #{k}"
   end
 end
 
