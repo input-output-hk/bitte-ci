@@ -8,9 +8,9 @@ in {
       package = lib.mkOption {
         type = lib.types.attrsOf lib.types.package;
         default = {
-          server = pkgs.bitte-ci.server-static;
-          listen = pkgs.bitte-ci.listen-static;
-          migrate = pkgs.bitte-ci.migrate-static;
+          server = pkgs.bitte-ci.server;
+          listen = pkgs.bitte-ci.listen;
+          migrate = pkgs.bitte-ci.migrate;
         };
       };
 
