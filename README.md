@@ -87,6 +87,7 @@ Nomad requires elevated permissions, so start it separately.
 
 Then, after `nix build`, run the bitte-ci listener and server:
 
+    ❯ ./result/bin/bitte-ci migrate # creates the schema
     ❯ ./result/bin/bitte-ci serve
     ❯ ./result/bin/bitte-ci listen
 
