@@ -47,7 +47,7 @@
     in {
       service.useHostStore = true;
       service.command =
-        [ "${pkgs.grafana-loki}/bin/loki" "--config.file=${./loki.json}" ];
+        [ "${pkgs.grafana-loki}/bin/loki" "--config.file=${config}" ];
       service.ports = [ "3100:3100" ];
     };
 
