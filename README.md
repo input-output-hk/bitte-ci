@@ -70,10 +70,6 @@ Building can be done using Nix:
 
     ❯ nix build
 
-Or Crystal:
-
-    ❯ shards build
-
 ## Develop
 For development, you can enter the devshell:
 

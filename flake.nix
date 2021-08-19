@@ -80,13 +80,6 @@
       pkgs = import inputs.nixpkgs {
         system = "x86_64-linux";
         overlays = [ overlay inputs.devshell.overlay ];
-        config = {
-          permittedInsecurePackages = [
-            # crystal depends on this version https://github.com/crystal-community/icr/issues/101
-            # only required for `shards build` -> `nix build` works with the 'normal' openssl pkg
-            "openssl-1.0.2u"
-          ];
-        };
       };
     in {
       inherit inputs;
@@ -116,10 +109,6 @@
             {
               name = "DOCKER_HOST";
               eval = "$([[ -S /run/podman/podman.sock ]] && echo 'unix:///run/podman/podman.sock' || echo 'unix:///run/docker.sock')";
-            }
-            {
-              name = "CRYSTAL_LIBRARY_PATH"; # shard build compat, prefer nix build
-              value = pkgs.lib.makeLibraryPath ([ pkgs.openssl_1_0_2 ] ++ (pkgs.lib.remove pkgs.openssl pkgs.bitte-ci.bitte-ci.buildInputs));
             }
             {
               name = "GITHUB_TOKEN";
