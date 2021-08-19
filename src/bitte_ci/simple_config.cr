@@ -81,7 +81,7 @@ module SimpleConfig
           %file = hash[%file_key]?
           %file = json[%file_key]?.try(&.as_s) if %file.nil?
           %file = ENV[%file_env_key]? if %file.nil? && %file_env_key
-          hash[{{ivar.stringify}}] = File.read(%file) unless %file.nil?
+          hash[{{ivar.stringify}}] = File.read(%file).strip unless %file.nil?
         {% end %}
       {% end %}
     end

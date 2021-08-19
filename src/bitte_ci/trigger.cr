@@ -20,6 +20,7 @@ module BitteCI
           Runner.run(::Log.for("runner"), config.for_runner, body)
         else
           Log.error { "HMAC Signature doesn't match. Verify the github hook and secret configured in bitte-ci match!" }
+          raise "HMAC Signature doesn't match. Verify the github hook and secret configured in bitte-ci match!"
         end
       else
         Log.info { "unknown event: #{event}" }

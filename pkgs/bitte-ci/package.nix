@@ -6,7 +6,7 @@ let
     "bitte-ci"
   else
     "bitte-ci-${extraArgs.name}";
-  version = "0.1.0";
+  version = "0.1.1";
   name = "${pname}-${version}";
 
   crystalLib = linkFarm "crystal-lib" (lib.mapAttrsToList (name: value: {
