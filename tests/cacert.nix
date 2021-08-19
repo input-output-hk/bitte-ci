@@ -3,15 +3,9 @@ pkgs.nixosTest {
   name = "cacert";
 
   nodes.ci = {
-    environment.systemPackages = with pkgs; [
-      bat
-      tree
-      strace
-    ];
+    environment.systemPackages = with pkgs; [ bat tree strace ];
 
-    system.extraDependencies = with pkgs; [
-      pkgs.cacert
-    ];
+    system.extraDependencies = with pkgs; [ pkgs.cacert ];
 
     environment.sessionVariables.NIXPKGS = toString pkgs.path;
 

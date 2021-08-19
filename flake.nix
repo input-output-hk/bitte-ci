@@ -2,7 +2,8 @@
   description = "Flake for Bitte CI";
 
   nixConfig.extra-substituters = "https://hydra.iohk.io";
-  nixConfig.extra-trusted-public-keys = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
+  nixConfig.extra-trusted-public-keys =
+    "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05";
@@ -95,8 +96,7 @@
 
       legacyPackages.x86_64-linux = pkgs;
 
-      defaultPackage.x86_64-linux =
-        self.packages.x86_64-linux.bitte-ci;
+      defaultPackage.x86_64-linux = self.packages.x86_64-linux.bitte-ci;
 
       devShell.x86_64-linux = let
         withCategory = category: attrset: attrset // { inherit category; };
@@ -106,92 +106,113 @@
       in pkgs.devshell.mkShell {
         name = "bitte-ci";
         env = [
-            {
-              name = "DOCKER_HOST";
-              eval = "$([[ -S /run/podman/podman.sock ]] && echo 'unix:///run/podman/podman.sock' || echo 'unix:///run/docker.sock')";
-            }
-            {
-              name = "GITHUB_TOKEN";
-              eval = "$(awk '/github.com/ {print $6;exit}' ~/.netrc)";
-            }
-            # bitte-ci cofig evironment
-            # TODO: prefix with BITTE_CI_
-            {
-              name = "PUBLIC_URL";
-              value = "http://127.0.0.1:9494";
-            }
-            {
-              name = "POSTGRES_URL";
-              value = "postgres://postgres@127.0.0.1:5432/bitte_ci";
-            }
-            {
-              name = "NOMAD_BASE_URL";
-              value = "http://127.0.0.1:4646";
-            }
-            {
-              name = "LOKI_BASE_URL";
-              value = "http://127.0.0.1:3100";
-            }
-            {
-              name = "NOMAD_DATACENTERS";
-              value = "dc1";
-            }
-            {
-              name = "GITHUB_USER_CONTENT_BASE_URL";
-              value = "https://raw.githubusercontent.com";
-            }
-            {
-              name = "NOMAD_TOKEN";
-              value = "snakeoil";
-            }
-            {
-              name = "ARTIFACT_SECRET";
-              value = "snakeoil";
-            }
-            {
-              name = "ARTIFACT_DIR";
-              eval = "$(mkdir -p $DEVSHELL_ROOT/.artifacts && echo '.artifacts')";
-            }
+          {
+            name = "CRYSTAL_LIBRARY_PATH";
+            value = pkgs.lib.makeLibraryPath (with pkgs; [
+              gmp
+              openssl
+              pcre
+              libevent
+              libyaml
+              zlib
+              file
+              libgit2
+              libssh2
+            ]);
+          }
+          {
+            name = "PKG_CONFIG_PATH";
+            value = builtins.concatStringsSep ":"
+              (map (path: "${path}/lib/pkgconfig")
+                pkgs.bitte-ci.bitte-ci.buildInputs);
+          }
+          {
+            name = "LLVM_CONFIG";
+            value = "${pkgs.llvm_10}/bin/llvm-config";
+          }
+          {
+            name = "DOCKER_HOST";
+            eval =
+              "$([[ -S /run/podman/podman.sock ]] && echo 'unix:///run/podman/podman.sock' || echo 'unix:///run/docker.sock')";
+          }
+          {
+            name = "GITHUB_TOKEN";
+            eval = "$(awk '/github.com/ {print $6;exit}' ~/.netrc)";
+          }
+          # bitte-ci cofig evironment
+          # TODO: prefix with BITTE_CI_
+          {
+            name = "PUBLIC_URL";
+            value = "http://127.0.0.1:9494";
+          }
+          {
+            name = "POSTGRES_URL";
+            value = "postgres://postgres@127.0.0.1:5432/bitte_ci";
+          }
+          {
+            name = "NOMAD_BASE_URL";
+            value = "http://127.0.0.1:4646";
+          }
+          {
+            name = "LOKI_BASE_URL";
+            value = "http://127.0.0.1:3100";
+          }
+          {
+            name = "NOMAD_DATACENTERS";
+            value = "dc1";
+          }
+          {
+            name = "GITHUB_USER_CONTENT_BASE_URL";
+            value = "https://raw.githubusercontent.com";
+          }
+          {
+            name = "NOMAD_TOKEN";
+            value = "snakeoil";
+          }
+          {
+            name = "ARTIFACT_SECRET";
+            value = "snakeoil";
+          }
+          {
+            name = "ARTIFACT_DIR";
+            eval = "$(mkdir -p $DEVSHELL_ROOT/.artifacts && echo '.artifacts')";
+          }
         ];
 
         # tempfix: remove when merged https://github.com/numtide/devshell/pull/123
-        devshell.startup.load_profiles = pkgs.lib.mkForce (pkgs.lib.noDepEntry ''
-          # PATH is devshell's exorbitant privilige:
-          # fence against its pollution
-          _PATH=''${PATH}
-          # Load installed profiles
-          for file in "$DEVSHELL_DIR/etc/profile.d/"*.sh; do
-            # If that folder doesn't exist, bash loves to return the whole glob
-            [[ -f "$file" ]] && source "$file"
-          done
-          # Exert exorbitant privilige and leave no trace
-          export PATH=''${_PATH}
-          unset _PATH
-        '');
+        devshell.startup.load_profiles = pkgs.lib.mkForce
+          (pkgs.lib.noDepEntry ''
+            # PATH is devshell's exorbitant privilege:
+            # fence against its' pollution
+            _PATH=''${PATH}
+            # Load installed profiles
+            for file in "$DEVSHELL_DIR/etc/profile.d/"*.sh; do
+              # If that folder doesn't exist, bash loves to return the whole glob
+              [[ -f "$file" ]] && source "$file"
+            done
+            # Exert exorbitant privilege and leave no trace
+            export PATH=''${_PATH}
+            unset _PATH
+          '');
 
         commands = [
           {
             name = "fmt";
             help = "Fix Nix formatting";
-            command = "nixfmt $(fd $DEVSHELL_ROOT)";
+            command = "fd . -e nix $DEVSHELL_ROOT -X nixfmt";
           }
           {
             name = "evalnix";
             help = "Check Nix parsing";
-            command = "fd --extension nix --exec nix-instantiate --parse --quiet {} >/dev/null";
+            command =
+              "fd --extension nix --exec nix-instantiate --parse --quiet {} >/dev/null";
           }
           (main {
             package = pkgs.crystal; # TODO: missing meta.description
           })
-          (main {
-            package = pkgs.crystal2nix;
-          })
-          (main {
-            package = pkgs.cue;
-          })
-          (main {
-            package = pkgs.arion;
-          })
+          (main { package = pkgs.crystal2nix; })
+          (main { package = pkgs.cue; })
+          (main { package = pkgs.arion; })
           (maintenance {
             name = "deps";
             help = "Do stuff with deps(?)"; # TODO
@@ -200,30 +221,34 @@
           (run {
             name = "launch-services";
             help = "Run the docker services like postgres";
-            command = "arion -f $DEVSHELL_ROOT/arion-compose.nix -p $DEVSHELL_ROOT/arion-pkgs.nix up";
+            command =
+              "arion -f $DEVSHELL_ROOT/arion-compose.nix -p $DEVSHELL_ROOT/arion-pkgs.nix up";
           })
           (run {
             name = "launch-nomad";
             help = "Launch nomad (will run sudo)";
-            command = "sudo -E ${pkgs.nomad}/bin/nomad agent -dev -config $DEVSHELL_ROOT/agent.hcl";
+            command =
+              "sudo -E ${pkgs.nomad}/bin/nomad agent -dev -config $DEVSHELL_ROOT/agent.hcl";
           })
         ];
 
-        packages = with pkgs; [
-          arion
-          websocat
-          grafana-loki
-          nomad
-          reproxy
-          ngrok
-          kcov
+        packages = with pkgs;
+          [
+            arion
+            websocat
+            grafana-loki
+            nomad
+            reproxy
+            ngrok
+            kcov
 
-          pkg-config
-          fd
+            pkg-config
+            fd
+            clang_10
 
-          nixfmt
-          nix
-        ] ++ pkgs.bitte-ci.bitte-ci.buildInputs;
+            nixfmt
+            nix
+          ] ++ pkgs.bitte-ci.bitte-ci.buildInputs;
       };
     };
 }

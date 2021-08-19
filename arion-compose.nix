@@ -119,7 +119,7 @@
 
           if [ ! -s "$PGDATA/PG_VERSION" ]; then
             su - postgres -c "${pkgs.postgresql}/bin/initdb -D '$PGDATA'"
-            su - postgres -c "${pkgs.postgresql}/bin/pg_ctl -D '$PGDATA' -o \"-c listen_addresses=${"''"} -p 5432\" -w start"
+            su - postgres -c "${pkgs.postgresql}/bin/pg_ctl -D '$PGDATA' -o \"-c listen_addresses=''' -p 5432\" -w start"
             su - postgres -c "${pkgs.postgresql}/bin/psql -v ON_ERROR_STOP=1 --username postgres --no-password -f ${initsql}"
             su - postgres -c "${pkgs.postgresql}/bin/pg_ctl -D '$PGDATA' -m fast -w stop"
           fi
