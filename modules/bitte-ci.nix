@@ -77,26 +77,27 @@ in {
 
       _configJson = lib.mkOption {
         type = lib.types.path;
-        default = builtins.toFile "config.json" (builtins.toJSON {
-          host = cfg.host;
-          port = cfg.port;
-          public_url = cfg.publicUrl;
-          postgres_url = cfg.postgresUrl;
-          github_user_content_base_url = cfg.githubUserContentUrl;
-          github_hook_secret_file = cfg.githubHookSecretFile;
-          nomad_base_url = cfg.nomadUrl;
-          loki_base_url = cfg.lokiUrl;
-          github_token_file = cfg.githubTokenFile;
-          github_user = cfg.githubUser;
-          nomad_token_file = cfg.nomadTokenFile;
-          nomad_datacenters = cfg.nomadDatacenters;
-          runner_flake = cfg.runnerFlake;
-          artifact_secret_file = cfg.artifactSecretFile;
-          artifact_dir = cfg.artifactDir;
-          nomad_ssl_ca = cfg.nomadSslCa;
-          nomad_ssl_key = cfg.nomadSslKey;
-          nomad_ssl_cert = cfg.nomadSslCert;
-        });
+        default = builtins.toFile "config.json" (builtins.toJSON
+          (lib.filterAttrs (name: value: value != null) {
+            host = cfg.host;
+            port = cfg.port;
+            public_url = cfg.publicUrl;
+            postgres_url = cfg.postgresUrl;
+            github_user_content_base_url = cfg.githubUserContentUrl;
+            github_hook_secret_file = cfg.githubHookSecretFile;
+            nomad_base_url = cfg.nomadUrl;
+            loki_base_url = cfg.lokiUrl;
+            github_token_file = cfg.githubTokenFile;
+            github_user = cfg.githubUser;
+            nomad_token_file = cfg.nomadTokenFile;
+            nomad_datacenters = cfg.nomadDatacenters;
+            runner_flake = cfg.runnerFlake;
+            artifact_secret_file = cfg.artifactSecretFile;
+            artifact_dir = cfg.artifactDir;
+            nomad_ssl_ca = cfg.nomadSslCa;
+            nomad_ssl_key = cfg.nomadSslKey;
+            nomad_ssl_cert = cfg.nomadSslCert;
+          }));
       };
     };
   };

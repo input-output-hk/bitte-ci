@@ -42,7 +42,7 @@ module BitteCI
       property nomad_ssl_cert : String?
 
       @[Option(help: "Build runner dependencies from this flake")]
-      property runner_flake = URI.parse("github:input-output-hk/bitte-ci")
+      property runner_flake : URI = URI.parse("github:input-output-hk/bitte-ci")
 
       @[Option(help: "Base URL e.g. http://127.0.0.1:3100")]
       property loki_base_url = URI.parse("http://127.0.0.1:4646")
