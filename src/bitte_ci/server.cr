@@ -75,9 +75,27 @@ module BitteCI
       @[Option(help: "Directory used for storign output uploads (will be created if it doesn't exist)")]
       property artifact_dir : String
 
+      @[Option(help: "Build runner dependencies from this flake")]
+      property runner_flake = URI.parse("github:input-output-hk/bitte-ci")
+
+      @[Option(help: "Specify a ci.cue file to use instad of fetching it from the base repo head")]
+      property ci_cue : String?
+
       def for_runner
         Runner::Config.new({
           "github_user_content_base_url" => github_user_content_base_url.to_s,
+          "nomad_base_url"               => nomad_base_url.to_s,
+          "nomad_datacenters"            => nomad_datacenters.to_s,
+          "nomad_ssl_ca"                 => nomad_ssl_ca.to_s,
+          "nomad_ssl_key"                => nomad_ssl_key.to_s,
+          "nomad_ssl_cert"               => nomad_ssl_cert.to_s,
+          "runner_flake"                 => runner_flake.to_s,
+          "loki_base_url"                => loki_base_url.to_s,
+          "nomad_token"                  => nomad_token.to_s,
+          "postgres_url"                 => postgres_url.to_s,
+          "ci_cue"                       => ci_cue.to_s,
+          "public_url"                   => public_url.to_s,
+          "artifact_secret"              => artifact_secret.to_s,
         }, nil)
       end
 
