@@ -100,6 +100,13 @@
 
       defaultPackage.x86_64-linux = self.packages.x86_64-linux.bitte-ci;
 
+      hydraJobs = {
+        build-command-static.x86_64-linux = self.packages.x86_64-linux.command-static;
+        build-prepare-static.x86_64-linux = self.packages.x86_64-linux.prepare-static;
+        build-cacert.x86_64-linux = self.packages.x86_64-linux.cacert; # this nixpkgs' version
+      };
+
+
       devShell.x86_64-linux = let
         withCategory = category: attrset: attrset // { inherit category; };
         main = withCategory "main";
