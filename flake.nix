@@ -1,6 +1,8 @@
 {
   description = "Flake for Bitte CI";
 
+  nixConfig.build-users-group = "";
+  nixConfig.extra-experimental-features = "nix-command flakes ca-references";
   nixConfig.extra-substituters = "https://hydra.iohk.io";
   nixConfig.extra-trusted-public-keys =
     "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
