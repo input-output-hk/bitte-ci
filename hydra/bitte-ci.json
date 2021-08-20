@@ -1,0 +1,18 @@
+{
+  "checkinterval": 30,
+  "description": "CI system running on a Bitte Cluster",
+  "enabled": 1,
+  "enableemail": true,
+  "hidden": false,
+  "inputs": {
+    "pullRequests": {
+      "emailresponsible": false,
+      "type": "githubpulls",
+      "value": "input-output-hk bitte-ci"
+    }
+  },
+  "keepnr": 3,
+  "nixexprinput": "declInput",
+  "nixexprpath": "hydra/bitte-ci.nix",
+  "schedulingshares": 300
+}
