@@ -45,7 +45,9 @@
   outputs = { self, ... }@inputs:
     let
       overlay = final: prev: {
-        bitte-ci = final.callPackage ./pkgs/bitte-ci { };
+        bitte-ci = import ./pkgs/bitte-ci {
+          inherit (final) lib callPackage pkgsStatic pkgsMusl;
+        };
 
         nix = inputs.nix.packages.${prev.system}.nix;
 
