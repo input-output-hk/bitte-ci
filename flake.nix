@@ -230,8 +230,10 @@
           (run {
             name = "launch-services";
             help = "Run the docker services like postgres";
-            command =
-              "arion -f $DEVSHELL_ROOT/arion-compose.nix -p $DEVSHELL_ROOT/arion-pkgs.nix up";
+            command = ''
+              trap "arion -f $DEVSHELL_ROOT/arion-compose.nix -p $DEVSHELL_ROOT/arion-pkgs.nix down" SIGINT
+              arion -f $DEVSHELL_ROOT/arion-compose.nix -p $DEVSHELL_ROOT/arion-pkgs.nix up
+            '';
           })
           (run {
             name = "launch-nomad";
