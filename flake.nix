@@ -3,9 +3,10 @@
 
   nixConfig.build-users-group = "";
   nixConfig.extra-experimental-features = "nix-command flakes ca-references";
-  nixConfig.extra-substituters = "https://hydra.iohk.io";
+  nixConfig.extra-substituters =
+    "https://hydra.iohk.io https://hydra.mantis.ist";
   nixConfig.extra-trusted-public-keys =
-    "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
+    "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= hydra.mantis.ist-1:4LTe7Q+5pm8+HawKxvmn2Hx0E3NbkYjtf1oWv+eAmTo=";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05";
@@ -92,20 +93,15 @@
       packages.x86_64-linux = {
         # just for development
         inherit (pkgs)
-          nix crystal libgit2 bdwgc tests arion reproxy ngrok project cacert
-          bash;
+          nix crystal libgit2 bdwgc arion reproxy ngrok project cacert bash;
+        inherit (pkgs.tests) test-bitte-ci;
       } // pkgs.bitte-ci;
 
       legacyPackages.x86_64-linux = pkgs;
 
       defaultPackage.x86_64-linux = self.packages.x86_64-linux.bitte-ci;
 
-      hydraJobs = {
-        build-command-static.x86_64-linux = self.packages.x86_64-linux.command-static;
-        build-prepare-static.x86_64-linux = self.packages.x86_64-linux.prepare-static;
-        build-cacert.x86_64-linux = self.packages.x86_64-linux.cacert; # this nixpkgs' version
-      };
-
+      hydraJobs = self.packages;
 
       devShell.x86_64-linux = let
         withCategory = category: attrset: attrset // { inherit category; };
