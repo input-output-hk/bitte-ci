@@ -84,7 +84,7 @@ module BitteCI
 
     def handle_line(db, line)
       return if line == "{}"
-      return if line "subscription closed by server, client should resubscribe"
+      return if line == "subscription closed by server, client should resubscribe"
       j = Line.from_json(line)
       j.events.each do |event|
         next unless event.is_a?(Allocation)
