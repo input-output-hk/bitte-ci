@@ -74,14 +74,17 @@ module BitteCI
 
         context = ssl_context(config) if nomad_url.scheme == "https"
 
-        HTTP::Client.get(nomad_url, headers: headers, tls: context) do |res|
-          res.body_io.each_line { |line| handle_line(db, line) }
+        loop do
+          HTTP::Client.get(nomad_url, headers: headers, tls: context) do |res|
+            res.body_io.each_line { |line| handle_line(db, line) }
+          end
         end
       end
     end
 
     def handle_line(db, line)
       return if line == "{}"
+      return if line "subscription closed by server, client should resubscribe"
       j = Line.from_json(line)
       j.events.each do |event|
         next unless event.is_a?(Allocation)
