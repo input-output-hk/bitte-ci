@@ -138,13 +138,16 @@ module BitteCI
         @returned.receive
       end
 
-      if status.normal_exit? && status.success?
-        FileUtils.mkdir_p("/alloc/.bitte-ci")
-        File.write(File.join("/alloc/.bitte-ci", @config.name), "ok")
-        post_start
-      end
+      FileUtils.mkdir_p(status_dir)
+      File.write(status_dir / @config.name, status.exit_status.to_s)
+
+      post_start if status.normal_exit? && status.success?
 
       exit status.exit_status
+    end
+
+    def status_dir
+      Path.new("/alloc/.bitte-ci")
     end
 
     def start_process
@@ -166,6 +169,12 @@ module BitteCI
         file = File.join("/alloc/.bitte-ci/", task_name)
         until File.file?(file)
           sleep 1
+        end
+
+        dependency_status = Process::Status.new(File.read(status_dir/task_name).to_i)
+
+        unless dependency_status.success?
+          raise "Dependency #{task_name} failed with #{dependency_status.exit_status}"
         end
       end
     end
