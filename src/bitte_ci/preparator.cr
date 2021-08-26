@@ -51,6 +51,7 @@ module BitteCI
         remote = repo.remote_lookup("origin")
         Git.remote_fetch(remote, ["refs/pull/#{@config.pr_number}/head"])
         repo.reset(@config.sha)
+        repo.fetch_submodules
       else
         raise "Git clone failed"
       end

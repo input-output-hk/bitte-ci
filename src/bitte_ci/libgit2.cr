@@ -81,6 +81,8 @@ lib LibGit
   type Repository = Void*
   type Object = Void*
   type Reference = Void*
+  type Submodule = Void*
+  type Payload = Void*
 
   struct Refspec
     string : LibC::Char*
@@ -98,10 +100,11 @@ lib LibGit
     id_abbrev : UInt16T
   end
 
-  type CheckoutNotifyCb = (CheckoutNotify, LibC::Char*, DiffFile, DiffFile, DiffFile, Void* -> LibC::Int)
-  type DiffProgressCb = (Diff*, LibC::Char*, LibC::Char*, Void* -> LibC::Int)
-  type RepositoryCreateCb = (Repository**, LibC::Char*, LibC::Int, Void* -> LibC::Int)
-  type RemoteCreateCb = (Remote**, Repository*, LibC::Char*, LibC::Char*, Void* -> LibC::Int)
+  type CheckoutNotifyCb = CheckoutNotify, LibC::Char*, DiffFile, DiffFile, DiffFile, Void* -> LibC::Int
+  type DiffProgressCb = Diff*, LibC::Char*, LibC::Char*, Void* -> LibC::Int
+  type RepositoryCreateCb = Repository**, LibC::Char*, LibC::Int, Void* -> LibC::Int
+  type RemoteCreateCb = Remote**, Repository*, LibC::Char*, LibC::Char*, Void* -> LibC::Int
+  type SubmoduleCb = Submodule*, LibC::Char*, Payload* -> LibC::Int
 
   type Tree = Void*
   type Index = Void*
@@ -168,6 +171,13 @@ lib LibGit
     repository_cb_payload : Void*
     remote_cb : RemoteCreateCb
     remote_cb_payload : Void*
+  end
+
+  struct SubmoduleUpdateOptions
+    version : LibC::UInt
+    checkout_opts : CheckoutOptions
+    fetch_opts : FetchOptions
+    allow_fetch : LibC::Int
   end
 
   struct ArrayT
@@ -283,11 +293,20 @@ lib LibGit
   fun git_repository_open(out : Repository*, path : LibC::Char*) : LibC::Int
 
   fun git_reset(repo : Repository, target : Object, reset_type : RESET, checkout_opts : CheckoutOptions*) : LibC::Int
+
+  fun git_submodule_init(out : Submodule*, overwrite : LibC::Int) : LibC::Int
+  fun git_submodule_foreach(
+    repo : Repository,
+    callback : Submodule*, LibC::Char*, Payload* -> LibC::Int,
+    payload : Payload
+  ) : LibC::Int
+
+  fun git_submodule_update(submodule : Submodule*, init : LibC::Int, options : SubmoduleUpdateOptions*) : LibC::Int
 end
 
 module Git
   module Helper
-    def check(res)
+    def self.check(res)
       return if res == 0
       e = LibGit.git_error_last
       if e.null?
@@ -295,6 +314,10 @@ module Git
       else
         raise String.new(e.value.message)
       end
+    end
+
+    def check(res)
+      Helper.check(res)
     end
   end
 
@@ -343,6 +366,17 @@ module Git
     def remote_lookup(name)
       check(LibGit.git_remote_lookup(out remote, @repo, name))
       remote
+    end
+
+    def fetch_submodules
+      LibGit.git_submodule_foreach(
+        @repo,
+        ->(submodule, name, payload) {
+          Helper.check(LibGit.git_submodule_update(submodule, 1, nil))
+          LibC::Int.new(0)
+        },
+        nil
+      )
     end
   end
 
