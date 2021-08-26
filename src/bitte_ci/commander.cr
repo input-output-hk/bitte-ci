@@ -157,6 +157,7 @@ module BitteCI
       Git.init
       repo = Git.clone(REPO_ALLOC, REPO_LOCAL)
       repo.reset(@config.sha)
+      repo.fetch_submodules
     end
 
     def pre_start
