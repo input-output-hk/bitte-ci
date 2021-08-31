@@ -312,7 +312,7 @@ module Git
       if e.null?
         raise "LibGit error without message: #{res.inspect} (#{LibGit::Error.new(res)}"
       else
-        raise String.new(e.value.message)
+        raise "LibGit error: #{String.new(e.value.message)}"
       end
     end
 

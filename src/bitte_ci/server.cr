@@ -84,6 +84,8 @@ module BitteCI
       def for_runner
         Runner::Config.new({
           "github_user_content_base_url" => github_user_content_base_url,
+          "github_user"                  => github_user,
+          "github_token"                 => github_token,
           "nomad_base_url"               => nomad_base_url,
           "nomad_datacenters"            => nomad_datacenters.to_json,
           "nomad_ssl_ca"                 => nomad_ssl_ca,

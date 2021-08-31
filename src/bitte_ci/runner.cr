@@ -26,6 +26,12 @@ module BitteCI
       @[Option(help: "Base URL e.g. https://raw.githubusercontent.com")]
       property github_user_content_base_url : URI = URI.parse("https://raw.githubusercontent.com")
 
+      @[Option(help: "The user for setting Github status")]
+      property github_user : String
+
+      @[Option(secret: true, help: "The token for setting Github status")]
+      property github_token : String
+
       @[Option(help: "Base URL e.g. http://127.0.0.1:4646")]
       property nomad_base_url = URI.parse("http://127.0.0.1:4646")
 
@@ -153,16 +159,19 @@ module BitteCI
 
       full_name = @pr.base.repo.full_name
       sha = @pr.base.sha
-      ci_cue_url = @config.github_user_content_base_url.dup
-      ci_cue_url.path = "/#{full_name}/#{sha}/ci.cue"
+      content_url = @config.github_user_content_base_url.dup
+      path = "/#{full_name}/#{sha}/ci.cue"
 
-      res = HTTP::Client.get(ci_cue_url)
+      client = HTTP::Client.new(content_url)
+      client.basic_auth @config.github_user, @config.github_token
+
+      res = client.get(path)
 
       case res.status
       when HTTP::Status::OK
         res.body
       else
-        raise "HTTP Error while trying to GET ci.cue from #{ci_cue_url} : #{res.status.to_i} #{res.status_message}"
+        raise "HTTP Error while trying to GET ci.cue from #{content_url}#{path} : #{res.status.to_i} #{res.status_message}"
       end
     end
   end
