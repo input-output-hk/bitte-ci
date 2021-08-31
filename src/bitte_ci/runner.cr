@@ -86,6 +86,7 @@ module BitteCI
 
     property log : Log
     property ci_cue : String
+    property steps_json : String
     property job_config : JobConfig
     property raw : String
 
@@ -104,6 +105,7 @@ module BitteCI
 
     def initialize(@log : Log, @pr : GithubHook::PullRequest, @raw : String, @config : Config)
       @ci_cue = fetch_ci_cue
+      @steps_json = fetch_devshell_steps_json
       @job_config = export_job_config
     end
 
@@ -119,22 +121,30 @@ module BitteCI
 
     def export_job_config
       pr_tmp_json = File.tempname("pr", ".json")
+      pr_tmp_steps_json = File.tempname("steps", ".json")
       pr_tmp_cue = File.tempname("pr", ".cue")
+      pr_tmp_steps_cue = File.tempname("steps", ".cue")
       pr_tmp_schema = File.tempname("schema", ".cue")
       pr_tmp_ci = File.tempname("ci", ".cue")
 
       File.write(pr_tmp_json, @raw)
       File.write(pr_tmp_schema, {{ read_file "cue/schema.cue" }}) # this is read at compile time
       File.write(pr_tmp_ci, @ci_cue)
+      File.write(pr_tmp_steps_json, @steps_json)
 
       pr_cue_mem = IO::Memory.new
       status = Process.run("cue", output: STDOUT, error: STDERR,
         args: ["import", "json", "-p", "ci", "-o", pr_tmp_cue, pr_tmp_json])
-      raise "Failed to import JSON to CUE. Exited with: #{status.exit_status}" unless status.success?
+      raise "Failed to import PR JSON to CUE. Exited with: #{status.exit_status}" unless status.success?
+
+      steps_cue_mem = IO::Memory.new
+      status = Process.run("cue", output: STDOUT, error: STDERR,
+        args: ["import", "json", "-p", "ci", "-o", pr_tmp_steps_cue, pr_tmp_steps_json])
+      raise "Failed to import steps JSON to CUE. Exited with: #{status.exit_status}" unless status.success?
 
       mem = IO::Memory.new
       status = Process.run("cue", output: mem, error: STDERR,
-        args: ["export", pr_tmp_schema, pr_tmp_cue, pr_tmp_ci])
+        args: ["export", pr_tmp_schema, pr_tmp_cue, pr_tmp_steps_cue, pr_tmp_ci])
       raise "Failed to export CUE to JSON. Exited with: #{status.exit_status}" unless status.success?
 
       Log.info { "Exported CUE" }
@@ -144,6 +154,47 @@ module BitteCI
       [pr_tmp_cue, pr_tmp_json, pr_tmp_schema, pr_tmp_ci].each do |file|
         File.delete file if file && File.file?(file)
       end
+    end
+
+    def fetch_devshell_steps_json
+      full_name = @pr.base.repo.full_name
+      sha = @pr.base.sha
+
+      
+
+      entrypoint_mem = IO::Memory.new
+      status = Process.run("nix", output: entrypoint_mem, error: STDERR,
+        args: ["eval", "--raw", "github:#{full_name}/#{sha}.#devShell.x86_64-linux.outPath"])
+      raise "Failed to determine nix store-path of devshell entrypoint. Exited with: #{status.exit_status}" unless status.success?
+
+      entrypoint = entrypoint_mem.to_s
+
+      nix_transform = <<-NIX
+      op = lhs: cmd: lhs // (
+        if cmd.name != null
+        then {
+          ${cmd.name} = {
+            command = [ "#{entrypoint}" "--pure" cmd.name];
+            label = cmd.help;
+          };
+        }
+        else {}
+      );
+      devshellSteps = builtins.foldl' op {}
+      NIX
+
+      mem = IO::Memory.new
+      status = Process.run("nix", output: mem, error: STDERR,
+        args: [
+          "eval",
+          "--apply",
+          "#{nix_transform}",
+          "--json",
+          "github:#{full_name}/#{sha}.#devShell.x86_64-linux.passthru.config.commands"
+        ])
+      raise "Failed to import fetch devshell JSON. Exited with: #{status.exit_status}" unless status.success?
+
+      mem.to_s
     end
 
     def fetch_ci_cue
