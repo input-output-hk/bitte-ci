@@ -39,38 +39,48 @@ lib LibGit
     All       = 0x0FFFF
   end
 
-  enum CHECKOUT
-    NONE                    = 0
-    SAFE                    = 1 << 0
-    FORCE                   = 1 << 1
-    RECREATE_MISSING        = 1 << 2
-    ALLOW_CONFLICTS         = 1 << 4
-    REMOVE_UNTRACKED        = 1 << 5
-    REMOVE_IGNORED          = 1 << 6
-    UPDATE_ONLY             = 1 << 7
-    DONT_UPDATE_INDEX       = 1 << 8
-    NO_REFRESH              = 1 << 9
-    SKIP_UNMERGED           = 1 << 10
-    USE_OURS                = 1 << 11
-    USE_THEIRS              = 1 << 12
-    DISABLE_PATHSPEC_MATCH  = 1 << 13
-    SKIP_LOCKED_DIRECTORIES = 1 << 18
-    DONT_OVERWRITE_IGNORED  = 1 << 19
-    CONFLICT_STYLE_MERGE    = 1 << 20
-    CONFLICT_STYLE_DIFF3    = 1 << 21
-    DONT_REMOVE_EXISTING    = 1 << 22
-    DONT_WRITE_INDEX        = 1 << 23
+  enum Checkout
+    None                  = 0
+    Safe                  = 1 << 0
+    Force                 = 1 << 1
+    RecreateMissing       = 1 << 2
+    AllowConflicts        = 1 << 4
+    RemoveUntracked       = 1 << 5
+    RemoveIgnored         = 1 << 6
+    UpdateOnly            = 1 << 7
+    DontUpdateIndex       = 1 << 8
+    NoRefresh             = 1 << 9
+    SkipUnmerged          = 1 << 10
+    UseOurs               = 1 << 11
+    UseTheirs             = 1 << 12
+    DisablePathspecMatch  = 1 << 13
+    SkipLockedDirectories = 1 << 18
+    DontOverwriteIgnored  = 1 << 19
+    ConflictStyleMerge    = 1 << 20
+    ConflictStyleDiff3    = 1 << 21
+    DontRemoveExisting    = 1 << 22
+    DontWriteIndex        = 1 << 23
   end
 
-  enum OBJECT
-    ANY       = -2
-    INVALID   = -1
-    COMMIT    =  1
-    TREE      =  2
-    BLOB      =  3
-    TAG       =  4
-    OFS_DELTA =  6
-    REF_DELTA =  7
+  enum ObjectT
+    Any      = -2
+    Invalid  = -1
+    Commit   =  1
+    Tree     =  2
+    Blob     =  3
+    Tag      =  4
+    OfsDelta =  6
+    RefDelta =  7
+  end
+
+  enum GitCredential
+    UserpassPlaintext = 1 << 0
+    SshKey            = 1 << 1
+    SshCustom         = 1 << 2
+    Default           = 1 << 3
+    SshInteractive    = 1 << 4
+    Username          = 1 << 5
+    SshMemory         = 1 << 6
   end
 
   alias UInt16T = LibC::UShort
@@ -101,13 +111,6 @@ lib LibGit
     id_abbrev : UInt16T
   end
 
-  type CheckoutNotifyCb = CheckoutNotify, LibC::Char*, DiffFile, DiffFile, DiffFile, Void* -> LibC::Int
-  type DiffProgressCb = Diff*, LibC::Char*, LibC::Char*, Void* -> LibC::Int
-  type RepositoryCreateCb = Repository**, LibC::Char*, LibC::Int, Void* -> LibC::Int
-  type RemoteCreateCb = Remote**, Repository*, LibC::Char*, LibC::Char*, Void* -> LibC::Int
-  type SubmoduleCb = Submodule*, LibC::Char*, Payload* -> LibC::Int
-  type CredentialAcquireCb = Credential*, LibC::Char*, LibC::Char*, LibC::UInt, Void* -> LibC::Int 
-
   type Tree = Void*
   type Index = Void*
 
@@ -122,15 +125,15 @@ lib LibGit
 
   struct CheckoutOptions
     version : LibC::UInt
-    checkout_strategy : CHECKOUT
+    checkout_strategy : Checkout
     disable_filters : LibC::Int
     dir_mode : LibC::UInt
     file_mode : LibC::UInt
     file_open_flags : LibC::Int
     notify_flags : LibC::UInt
-    git_checkout_notify_cb : CheckoutNotifyCb
+    git_checkout_notify_cb : Void*
     notify_payload : Void*
-    progress_cb : DiffProgressCb
+    progress_cb : Void*
     progress_payload : Void*
     paths : Strarray
     baseline : Tree*
@@ -169,9 +172,9 @@ lib LibGit
     bare : LibC::Int
     local : CloneLocal
     checkout_branch : LibC::Char*
-    repository_cb : RepositoryCreateCb
+    repository_cb : Void*
     repository_cb_payload : Void*
-    remote_cb : RemoteCreateCb
+    remote_cb : Void*
     remote_cb_payload : Void*
   end
 
@@ -179,7 +182,7 @@ lib LibGit
     version : LibC::UInt
     sideband_progress : Void*
     completion : Void*
-    credentials : CredentialAcquireCb
+    credentials : Void*
     certificate_check : Void*
     transfer_progress : Void*
     update_tips : Void*
@@ -188,7 +191,6 @@ lib LibGit
     push_update_reference : Void*
     push_negotiation : Void*
     transport : Void*
-    remote_ready : Void*
     payload : Void*
     resolve_url : Void*
   end
@@ -232,48 +234,48 @@ lib LibGit
   end
 
   enum Error
-    NONE       = 0
-    NOMEMORY
-    OS
-    INVALID
-    REFERENCE
-    ZLIB
-    REPOSITORY
-    CONFIG
-    REGEX
-    ODB
-    INDEX
-    OBJECT
-    NET
-    TAG
-    TREE
-    INDEXER
-    SSL
-    SUBMODULE
-    THREAD
-    STASH
-    CHECKOUT
-    FETCHHEAD
-    MERGE
-    SSH
-    FILTER
-    REVERT
-    CALLBACK
-    CHERRYPICK
-    DESCRIBE
-    REBASE
-    FILESYSTEM
-    PATCH
-    WORKTREE
-    SHA1
-    HTTP
-    INTERNAL
+    None       = 0
+    Nomemory
+    Os
+    Invalid
+    Reference
+    Zlib
+    Repository
+    Config
+    Regex
+    Odb
+    Index
+    Object
+    Net
+    Tag
+    Tree
+    Indexer
+    Ssl
+    Submodule
+    Thread
+    Stash
+    Checkout
+    Fetchhead
+    Merge
+    Ssh
+    Filter
+    Revert
+    Callback
+    Cherrypick
+    Describe
+    Rebase
+    Filesystem
+    Patch
+    Worktree
+    Sha1
+    Http
+    Internal
   end
 
-  enum RESET
-    SOFT  = 1
-    MIXED
-    HARD
+  enum Reset
+    Soft  = 1
+    Mixed
+    Hard
   end
 
   struct GitError
@@ -284,11 +286,13 @@ lib LibGit
   fun git_error_last : GitError*
   fun git_error_clear
 
+  fun git_fetch_options_init(out : FetchOptions*, version : LibC::UInt) : LibC::Int
+
   fun git_remote_create(out : Remote*, repo : Repository, name : LibC::Char*, url : LibC::Char*) : LibC::Int
   fun git_remote_fetch(remote : Remote, refspecs : Strarray*, opts : FetchOptions*, reflog_message : LibC::Char*) : LibC::Int
-  fun git_fetch_options_init(out: FetchOptions*, version : LibC::UInt) : LibC::Int
   fun git_remote_list(out : Strarray*, repo : Repository) : LibC::Int
   fun git_remote_lookup(out : Remote*, repo : Repository, name : LibC::Char*) : LibC::Int
+  fun git_remote_init_callbacks(out : RemoteCallbacks*, version : LibC::UInt) : LibC::Int
 
   fun git_checkout_options_init(out : CheckoutOptions*, version : LibC::UInt) : LibC::Int
   fun git_checkout_tree(repo : Repository, treeish : Object, opts : CheckoutOptions*) : LibC::Int
@@ -302,9 +306,12 @@ lib LibGit
 
   fun git_libgit2_init : LibC::Int
 
-  fun git_credential_userpass_plaintext_new(out : Credential*, username : LibC::Char*, password : LibC::Char*) : LibC::Int
+  fun git_credential_userpass_plaintext_new(Credential**, username : LibC::Char*, password : LibC::Char*) : LibC::Int
+  fun git_credential_userpass(Credential**, url : LibC::Char*, user_from_url : LibC::Char*, allowed_types : LibC::UInt, payload : Void*) : LibC::Int
+  fun git_credential_ssh_key_new(Credential**, username : LibC::Char*, publickey : LibC::Char*, privatekey : LibC::Char*, passphrase : LibC::Char*) : LibC::Int
+  fun git_credential_ssh_key_from_agent(Credential**, username : LibC::Char*) : LibC::Int
 
-  fun git_object_lookup(out : Object*, repo : Repository, oid : OID*, type : OBJECT) : LibC::Int
+  fun git_object_lookup(out : Object*, repo : Repository, oid : OID*, type : ObjectT) : LibC::Int
 
   fun git_oid_fmt(str : UInt8*, oid : OID*) : LibC::Int
   fun git_oid_fromstrn(out : OID*, str : LibC::Char*, len : LibC::SizeT) : LibC::Int
@@ -315,7 +322,7 @@ lib LibGit
   fun git_repository_init(out : Repository*, path : LibC::Char*, is_bare : LibC::UInt) : LibC::Int
   fun git_repository_open(out : Repository*, path : LibC::Char*) : LibC::Int
 
-  fun git_reset(repo : Repository, target : Object, reset_type : RESET, checkout_opts : CheckoutOptions*) : LibC::Int
+  fun git_reset(repo : Repository, target : Object, reset_type : Reset, checkout_opts : CheckoutOptions*) : LibC::Int
 
   fun git_submodule_init(out : Submodule*, overwrite : LibC::Int) : LibC::Int
   fun git_submodule_foreach(
@@ -377,12 +384,12 @@ module Git
     def reset(rev)
       obj = object_lookup(rev)
       checkout_options = Git.checkout_options_init
-      check(LibGit.git_reset(@repo, obj, LibGit::RESET::HARD, pointerof(checkout_options)))
+      check(LibGit.git_reset(@repo, obj, LibGit::Reset::Hard, pointerof(checkout_options)))
     end
 
     def object_lookup(rev)
       check(LibGit.git_oid_fromstr(out oid, rev))
-      check(LibGit.git_object_lookup(out obj, @repo, pointerof(oid), LibGit::OBJECT::ANY))
+      check(LibGit.git_object_lookup(out obj, @repo, pointerof(oid), LibGit::ObjectT::Any))
       obj
     end
 
@@ -403,45 +410,30 @@ module Git
     end
   end
 
-  def self.authenticate(username, password)
-    check(LibGit.git_credential_userpass_plaintext_new(out credentials, username, password))
-    credentials
-  end
-
-  def self.clone_options_init
+  def self.clone_options_init : LibGit::CloneOptions
     check(LibGit.git_clone_options_init(out clone_options, 1))
     clone_options
   end
 
-  def self.clone(url, path, username, password) : Repository
+  def self.clone(url, path, given_creds : Credentials) : Repository
     clone_options = clone_options_init
-    fetch_options = fetch_options_init(username, password)
+    fetch_options = fetch_options_init(given_creds)
     clone_options.fetch_opts = fetch_options
-    check(LibGit.git_clone(out repo, url, path, clone_options))
-    Repository.new(repo)
-  end
 
-  def self.checkout(repo, sha1)
-    checkout_options = checkout_options_init
-    check(LibGit.git_checkout_tree(repo, obj, pointerof(checkout_options)))
+    check(LibGit.git_clone(out repo, url, path, pointerof(clone_options)))
+
+    Repository.new(repo)
   end
 
   def self.checkout_options_init
     check(LibGit.git_checkout_options_init(out checkout_options, 1))
-    checkout_options.checkout_strategy = LibGit::CHECKOUT::FORCE
+    checkout_options.checkout_strategy = LibGit::Checkout::Force
     checkout_options
-  end
-
-  def self.fetch_options_init(username, password)
-    check(LibGit.git_fetch_options_init(out fetch_options, 1))
-    credentials = authenticate(username, password)
-    fetch_options.callbacks.credentials = credentials
-    fetch_options
   end
 
   def self.object_lookup(repo, sha1)
     check(LibGit.git_oid_fromstr(out oid, sha1))
-    check(LibGit.git_object_lookup(out obj, repo, pointerof(oid), LibGit::OBJECT::ANY))
+    check(LibGit.git_object_lookup(out obj, repo, oid.pointer, LibGit::OBJECT::ANY))
     obj
   end
 
@@ -450,11 +442,12 @@ module Git
     remote
   end
 
-  def self.remote_fetch(remote, refspecs)
+  def self.remote_fetch(remote, refspecs, given_creds : Credentials)
     specs = LibGit::Strarray.new
     specs.strings = refspecs.map(&.to_unsafe).to_unsafe
     specs.count = refspecs.size
-    check(LibGit.git_remote_fetch(remote, pointerof(specs), nil, nil))
+    fetch_options = fetch_options_init(given_creds)
+    check(LibGit.git_remote_fetch(remote, pointerof(specs), pointerof(fetch_options), nil))
   end
 
   def self.remote_list(repo)
@@ -470,5 +463,91 @@ module Git
   def self.refspec_parse(input, fetch)
     check(LibGit.git_refspec_parse(out refspec, input, fetch ? 1 : 0))
     refspec
+  end
+
+  struct Credentials
+    property https_username : String?
+    property https_password : String?
+    property ssh_user : String?
+    property ssh_public_path : String?
+    property ssh_private_path : String?
+    property ssh_passphrase : String
+
+    def initialize(@https_username = nil, @https_password = nil, @ssh_user = nil, @ssh_public_path = nil, @ssh_private_path = nil, @ssh_passphrase = "")
+    end
+
+    def ssh_private_path
+      @ssh_private_path || raise "Path to the SSH private key must be set"
+    end
+
+    def ssh_public_path
+      @ssh_public_path || raise "Path to the SSH public key must be set"
+    end
+  end
+
+  def self.credentials(
+    credential : LibGit::Credential**,
+    url : String,
+    url_user : String?,
+    allowed_types : LibGit::GitCredential,
+    payload : Credentials
+  )
+    case
+    when allowed_types & LibGit::GitCredential::SshKey == LibGit::GitCredential::SshKey
+      user = payload.ssh_user || url_user || "git"
+
+      res = LibGit.git_credential_ssh_key_from_agent(
+        credential,
+        user,
+      )
+
+      if res != 0
+        check(LibGit.git_credential_ssh_key_new(
+          credential,
+          user,
+          payload.ssh_public_path,
+          payload.ssh_private_path,
+          payload.ssh_passphrase,
+        ))
+      end
+    when allowed_types & LibGit::GitCredential::UserpassPlaintext == LibGit::GitCredential::UserpassPlaintext
+      https_username = payload.https_username || url_user
+      raise "HTTPS username is missing" unless https_username
+
+      https_password = payload.https_password
+      raise "HTTPS password is missing" unless https_password
+
+      check(LibGit.git_credential_userpass_plaintext_new(
+        credential,
+        https_username,
+        https_password
+      ))
+    when allowed_types & LibGit::GitCredential::SshCustom == LibGit::GitCredential::SshCustom
+      raise "Unsupported: LibGit::GitCredential::SshCustom"
+    when allowed_types & LibGit::GitCredential::Default == LibGit::GitCredential::Default
+      raise "Unsupported: LibGit::GitCredential::Default"
+    when allowed_types & LibGit::GitCredential::SshInteractive == LibGit::GitCredential::SshInteractive
+      raise "Unsupported: LibGit::GitCredential::SshInteractive"
+    when allowed_types & LibGit::GitCredential::Username == LibGit::GitCredential::Username
+      raise "Unsupported: LibGit::GitCredential::Username"
+    when allowed_types & LibGit::GitCredential::SshMemory == LibGit::GitCredential::SshMemory
+      raise "Unsupported: LibGit::GitCredential::SshMemory"
+    end
+  end
+
+  def self.fetch_options_init(given_creds)
+    check(LibGit.git_fetch_options_init(out fetch_options, 1))
+
+    box = Box.box(given_creds)
+    fetch_options.callbacks.payload = box
+
+    fetch_options.callbacks.credentials = (->(credential : LibGit::Credential**, url : LibC::Char*, username_from_url : LibC::Char*, allowed_types : LibGit::GitCredential, payload : Void*) {
+      url_username = String.new(username_from_url) if username_from_url
+      v = Box(Credentials).unbox(payload)
+      credentials(credential, String.new(url), url_username, allowed_types, v)
+      0
+    }).pointer
+
+    fetch_options
   end
 end

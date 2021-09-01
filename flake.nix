@@ -254,6 +254,7 @@
             pkg-config
             fd
             clang_10
+            lldb_10
 
             nixfmt
             nix
