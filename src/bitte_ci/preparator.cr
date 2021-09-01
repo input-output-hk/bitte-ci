@@ -52,12 +52,13 @@ module BitteCI
       }
 
       Git.init
-      repo = Git.clone(@config.clone_url.to_s, "/alloc/repo", @config.github_user.to_s, @config.github_token.to_s)
+      cred = Git::Credentials.new(@config.github_user.to_s, @config.github_token.to_s)
+      repo = Git.clone(@config.clone_url.to_s, "/alloc/repo", cred)
       if repo
         remote = repo.remote_lookup("origin")
-        Git.remote_fetch(remote, ["refs/pull/#{@config.pr_number}/head"])
+        Git.remote_fetch(remote, ["refs/pull/#{@config.pr_number}/head"], cred)
         repo.reset(@config.sha)
-        repo.fetch_submodules
+        repo.fetch_submodules(cred)
       else
         raise "Git clone failed"
       end

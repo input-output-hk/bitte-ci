@@ -158,7 +158,7 @@ module BitteCI
     def copy_repo
       return unless File.directory?(REPO_ALLOC)
       Git.init
-      repo = Git.clone(REPO_ALLOC, REPO_LOCAL, nil, nil)
+      repo = Git.clone(REPO_ALLOC, REPO_LOCAL)
       repo.reset(@config.sha)
       repo.fetch_submodules
     end

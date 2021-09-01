@@ -327,11 +327,12 @@ lib LibGit
   fun git_submodule_init(out : Submodule*, overwrite : LibC::Int) : LibC::Int
   fun git_submodule_foreach(
     repo : Repository,
-    callback : Submodule*, LibC::Char*, Payload* -> LibC::Int,
-    payload : Payload
+    callback : Submodule*, LibC::Char*, Void* -> LibC::Int,
+    payload : Void*
   ) : LibC::Int
 
   fun git_submodule_update(submodule : Submodule*, init : LibC::Int, options : SubmoduleUpdateOptions*) : LibC::Int
+  fun git_submodule_update_options_init(out : SubmoduleUpdateOptions*, version : LibC::UInt) : LibC::Int
 end
 
 module Git
@@ -398,6 +399,27 @@ module Git
       remote
     end
 
+    def submodule_update_options_init : LibGit::SubmoduleUpdateOptions
+      check(LibGit.git_submodule_update_options_init(out submodule_update_options, 1))
+      submodule_update_options
+    end
+
+    def fetch_submodules(given_creds)
+      submodule_update_options = submodule_update_options_init
+      fetch_options = Git.fetch_options_init(given_creds)
+      submodule_update_options.fetch_opts = fetch_options
+      boxed_submodule_update_options = Box.box(submodule_update_options)
+      LibGit.git_submodule_foreach(
+        @repo,
+        ->(submodule, name, payload) {
+          v = Box(LibGit::SubmoduleUpdateOptions).unbox(payload)
+          Helper.check(LibGit.git_submodule_update(submodule, 1, pointerof(v)))
+          LibC::Int.new(0)
+        },
+        boxed_submodule_update_options
+      )
+    end
+
     def fetch_submodules
       LibGit.git_submodule_foreach(
         @repo,
@@ -421,6 +443,12 @@ module Git
     clone_options.fetch_opts = fetch_options
 
     check(LibGit.git_clone(out repo, url, path, pointerof(clone_options)))
+
+    Repository.new(repo)
+  end
+
+  def self.clone(url, path) : Repository
+    check(LibGit.git_clone(out repo, url, path, nil))
 
     Repository.new(repo)
   end

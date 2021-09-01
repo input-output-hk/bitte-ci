@@ -81,6 +81,8 @@ module BitteCI
           postgres_url: postgres_url,
           public_url: public_url,
           artifact_secret: artifact_secret,
+          github_user: github_user,
+          github_token: github_token,
         )
       end
 
@@ -205,7 +207,7 @@ module BitteCI
     struct Config
       getter nomad_datacenters, nomad_base_url, nomad_ssl_ca, nomad_ssl_cert,
         nomad_ssl_key, runner_flake, loki_base_url, nomad_token, postgres_url,
-        public_url, artifact_secret
+        public_url, artifact_secret, github_user, github_token
 
       def initialize(
         @nomad_datacenters : Array(String),
@@ -218,7 +220,9 @@ module BitteCI
         @nomad_token : String,
         @postgres_url : URI,
         @public_url : URI,
-        @artifact_secret : String
+        @artifact_secret : String,
+        @github_user : String,
+        @github_token : String
       )
       end
     end
@@ -401,6 +405,8 @@ module BitteCI
             "LABEL"         => @pr.head.label,
             "REF"           => @pr.head.ref,
             "FULL_NAME"     => @pr.base.repo.full_name,
+            "GITHUB_USER"   => @job_config.github_user,
+            "GITHUB_TOKEN"  => @job_config.github_token,
             # "GIT_TRACE"        => "2",
             # "GIT_CURL_VERBOSE" => "2",
           }.merge(@config.env),
