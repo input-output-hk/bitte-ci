@@ -83,6 +83,7 @@ lib LibGit
   type Reference = Void*
   type Submodule = Void*
   type Payload = Void*
+  type Credential = Void*
 
   struct Refspec
     string : LibC::Char*
@@ -105,6 +106,7 @@ lib LibGit
   type RepositoryCreateCb = Repository**, LibC::Char*, LibC::Int, Void* -> LibC::Int
   type RemoteCreateCb = Remote**, Repository*, LibC::Char*, LibC::Char*, Void* -> LibC::Int
   type SubmoduleCb = Submodule*, LibC::Char*, Payload* -> LibC::Int
+  type CredentialAcquireCb = Credential*, LibC::Char*, LibC::Char*, LibC::UInt, Void* -> LibC::Int 
 
   type Tree = Void*
   type Index = Void*
@@ -152,7 +154,7 @@ lib LibGit
 
   struct FetchOptions
     version : LibC::Int
-    callbacks : Void*
+    callbacks : RemoteCallbacks
     prune : Fetch
     update_fetchhead : LibC::Int
     download_tags : RemoteDownloadTags
@@ -171,6 +173,24 @@ lib LibGit
     repository_cb_payload : Void*
     remote_cb : RemoteCreateCb
     remote_cb_payload : Void*
+  end
+
+  struct RemoteCallbacks
+    version : LibC::UInt
+    sideband_progress : Void*
+    completion : Void*
+    credentials : CredentialAcquireCb
+    certificate_check : Void*
+    transfer_progress : Void*
+    update_tips : Void*
+    pack_progress : Void*
+    push_transfer_progress : Void*
+    push_update_reference : Void*
+    push_negotiation : Void*
+    transport : Void*
+    remote_ready : Void*
+    payload : Void*
+    resolve_url : Void*
   end
 
   struct SubmoduleUpdateOptions
@@ -266,6 +286,7 @@ lib LibGit
 
   fun git_remote_create(out : Remote*, repo : Repository, name : LibC::Char*, url : LibC::Char*) : LibC::Int
   fun git_remote_fetch(remote : Remote, refspecs : Strarray*, opts : FetchOptions*, reflog_message : LibC::Char*) : LibC::Int
+  fun git_fetch_options_init(out: FetchOptions*, version : LibC::UInt) : LibC::Int
   fun git_remote_list(out : Strarray*, repo : Repository) : LibC::Int
   fun git_remote_lookup(out : Remote*, repo : Repository, name : LibC::Char*) : LibC::Int
 
@@ -280,6 +301,8 @@ lib LibGit
   fun git_commit_lookup(out : Commit*, repo : Repository, oid : OID*) : LibC::Int
 
   fun git_libgit2_init : LibC::Int
+
+  fun git_credential_userpass_plaintext_new(out : Credential*, username : LibC::Char*, password : LibC::Char*) : LibC::Int
 
   fun git_object_lookup(out : Object*, repo : Repository, oid : OID*, type : OBJECT) : LibC::Int
 
@@ -380,8 +403,21 @@ module Git
     end
   end
 
-  def self.clone(url, path) : Repository
-    check(LibGit.git_clone(out repo, url, path, nil))
+  def self.authenticate(username, password)
+    check(LibGit.git_credential_userpass_plaintext_new(out credentials, username, password))
+    credentials
+  end
+
+  def self.clone_options_init
+    check(LibGit.git_clone_options_init(out clone_options, 1))
+    clone_options
+  end
+
+  def self.clone(url, path, username, password) : Repository
+    clone_options = clone_options_init
+    fetch_options = fetch_options_init(username, password)
+    clone_options.fetch_opts = fetch_options
+    check(LibGit.git_clone(out repo, url, path, clone_options))
     Repository.new(repo)
   end
 
@@ -394,6 +430,13 @@ module Git
     check(LibGit.git_checkout_options_init(out checkout_options, 1))
     checkout_options.checkout_strategy = LibGit::CHECKOUT::FORCE
     checkout_options
+  end
+
+  def self.fetch_options_init(username, password)
+    check(LibGit.git_fetch_options_init(out fetch_options, 1))
+    credentials = authenticate(username, password)
+    fetch_options.callbacks.credentials = credentials
+    fetch_options
   end
 
   def self.object_lookup(repo, sha1)

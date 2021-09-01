@@ -24,6 +24,12 @@ module BitteCI
       @[Option(help: "URL to clone the repo from")]
       property clone_url : URI
 
+      @[Option(help: "The user for setting Github status")]
+      property github_user : String
+
+      @[Option(secret: true, help: "The token for setting Github status")]
+      property github_token : String
+
       @[Option(help: "git checkout SHA")]
       property sha : String
 
@@ -46,7 +52,7 @@ module BitteCI
       }
 
       Git.init
-      repo = Git.clone(@config.clone_url.to_s, "/alloc/repo")
+      repo = Git.clone(@config.clone_url.to_s, "/alloc/repo", @config.github_user.to_s, @config.github_token.to_s)
       if repo
         remote = repo.remote_lookup("origin")
         Git.remote_fetch(remote, ["refs/pull/#{@config.pr_number}/head"])
