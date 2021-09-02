@@ -576,6 +576,11 @@ module Git
       0
     }).pointer
 
+    fetch_options.callbacks.certificate_check = (->(cert : Void*, valid : LibC::Int, host : LibC::Char*, payload : Void*) {
+      pp! String.new(host)
+      0
+    }).pointer
+
     fetch_options
   end
 end
