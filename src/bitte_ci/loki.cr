@@ -19,12 +19,13 @@ module BitteCI
 
     @loki_base_url : URI
     @labels : Hash(String, String) = {} of String => String
+    @obfuscate : Array(String)
 
     def self.new(loki_base_url)
       new(loki_base_url, {} of String => String)
     end
 
-    def initialize(@loki_base_url, @labels)
+    def initialize(@loki_base_url, @labels, @obfuscate)
       @inbox = Channel(Value).new
       @timer = Channel(Time).new(0)
       @done = Channel(Nil).new
@@ -144,6 +145,9 @@ module BitteCI
     end
 
     def log(text : String, labels : Hash(String, String) = @labels)
+      @obfuscate.each do |obfuscate_string|
+        text = text.gsub(obfuscate_string, "******")
+      end
       merged_labels = @labels.merge(labels)
       @log.debug &.emit(text: text, labels: merged_labels)
       @log.info { text }

@@ -27,6 +27,9 @@ module BitteCI
       @[Option(help: "args to pass to the command")]
       property args : Array(String) = Array(String).new
 
+      @[Option(help: "strings to obfuscate in the logs")]
+      property obfuscate : Array(String) = Array(String).new
+
       @[Option(help: %(JSON object or space separated key=value pairs of labels to send to loki e.g. {"foo":"bar"} or foo=bar))]
       property labels : Hash(String, String) = {} of String => String
 
@@ -116,7 +119,7 @@ module BitteCI
     REPO_LOCAL = "/local/repo"
 
     def initialize(@config : Config)
-      @loki = Loki.new(@config.loki_base_url, @config.to_labels)
+      @loki = Loki.new(@config.loki_base_url, @config.to_labels, @config.obfuscate)
       @timeout = Channel(Signal).new
       @exited = Channel(Process::Status).new
       @returned = Channel(Process::Status).new

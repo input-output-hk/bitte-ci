@@ -376,6 +376,8 @@ module BitteCI
         command = [@config.command].flatten
         args = command.size > 1 ? command[1..-1] : [] of String
 
+        obfuscate = [@job_config.github_token]
+
         {
           Name:   @name,
           Driver: "exec",
@@ -387,6 +389,7 @@ module BitteCI
               "--name", @name,
               "--command", command[0],
               "--args", args.to_json,
+              "--obfuscate", obfuscate.to_json,
               "--loki-base-url", @job_config.loki_base_url.to_s,
               "--public-url", @job_config.public_url.to_s,
               "--after", @config.after.to_json,
