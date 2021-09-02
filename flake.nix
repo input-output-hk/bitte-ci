@@ -146,8 +146,20 @@
             name = "GITHUB_TOKEN";
             eval = "$(awk '/github.com/ {print $6;exit}' ~/.netrc)";
           }
+          {
+            name = "GITHUB_USER";
+            eval = "$(awk '/github.com/ {print $4;exit}' ~/.netrc)";
+          }
+          {
+            name = "GITHUB_HOOK_SECRET";
+            value = "not-relevant";
+          }
           # bitte-ci cofig evironment
           # TODO: prefix with BITTE_CI_
+          {
+            name = "RUNNER_FLAKE";
+            eval = "$(echo path:$DEVSHELL_ROOT)";
+          }
           {
             name = "PUBLIC_URL";
             value = "http://127.0.0.1:9494";
