@@ -83,6 +83,40 @@ lib LibGit
     SshMemory         = 1 << 6
   end
 
+  enum Opt
+    GetMwindowSize
+    SetMwindowSize
+    GetMwindowMappedLimit
+    SetMwindowMappedLimit
+    GetSearchPath
+    SetSearchPath
+    SetCacheObjectLimit
+    SetCacheMaxSize
+    EnableCaching
+    GetCachedMemory
+    GetTemplatePath
+    SetTemplatePath
+    SetSslCertLocations
+    SetUserAgent
+    EnableStrictObjectCreation
+    EnableStrictSymbolicRefCreation
+    SetSslCiphers
+    GetUserAgent
+    EnableOfsDelta
+    EnableFsyncGitdir
+    GetWindowsSharemode
+    SetWindowsSharemode
+    EnableStrictHashVerification
+    SetAllocator
+    EnableUnsavedIndexSafety
+    GetPackMaxObjects
+    SetPackMaxObjects
+    DisablePackKeepFileChecks
+    EnableHttpExpectContinue
+    GetMwindowFileLimit
+    SetMwindowFileLimit
+  end
+
   alias UInt16T = LibC::UShort
   alias UInt32T = LibC::UInt
   type Diff = Void*
@@ -113,6 +147,23 @@ lib LibGit
 
   type Tree = Void*
   type Index = Void*
+
+  enum CertT
+    None
+    X509
+    HostKeyLibssh2
+    Strarray
+  end
+
+  struct Cert
+    cert_type : CertT
+  end
+
+  struct CertX509
+    parent : Cert
+    data : Char*
+    len : LibC::SizeT
+  end
 
   struct OID
     id : UInt8[20]
@@ -305,6 +356,7 @@ lib LibGit
   fun git_commit_lookup(out : Commit*, repo : Repository, oid : OID*) : LibC::Int
 
   fun git_libgit2_init : LibC::Int
+  fun git_libgit2_opts(option : LibC::Int, ...) : LibC::Int
 
   fun git_credential_userpass_plaintext_new(Credential**, username : LibC::Char*, password : LibC::Char*) : LibC::Int
   fun git_credential_userpass(Credential**, url : LibC::Char*, user_from_url : LibC::Char*, allowed_types : LibC::UInt, payload : Void*) : LibC::Int
@@ -356,6 +408,11 @@ module Git
 
   def self.init
     LibGit.git_libgit2_init
+    LibGit.git_libgit2_opts(
+      LibGit::Opt::SetSslCertLocations, 
+      ENV["SSL_CERT_FILE"],
+      nil
+    )
   end
 
   class Repository
