@@ -296,10 +296,10 @@ module BitteCI
         property coalesced_failures : UInt64?
 
         @[JSON::Field(key: "ConstraintFiltered")]
-        property constraint_filtered : Nil
+        property constraint_filtered : Hash(String, Int64)?
 
         @[JSON::Field(key: "DimensionExhausted")]
-        property dimension_exhausted : Nil
+        property dimension_exhausted : Hash(String, Int64)?
 
         @[JSON::Field(key: "NodesAvailable")]
         property nodes_available : Hash(String, UInt64)
