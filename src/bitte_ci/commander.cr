@@ -160,6 +160,7 @@ module BitteCI
 
     def copy_repo
       return unless File.directory?(REPO_ALLOC)
+      return if File.directory?(REPO_LOCAL)
       Git.init
       repo = Git.clone(REPO_ALLOC, REPO_LOCAL)
       repo.reset(@config.sha)
