@@ -116,7 +116,15 @@ module BitteCI
     end
 
     def run
-      Log.info &.emit("Queue Job", step: @job_config.to_json)
+      @log.info &.emit("Queue Job", step: @job_config.to_json)
+
+      if @job_config.ci.steps.empty?
+        @log.info &.emit("Skip Job because steps are empty", step: @job_config.to_json)
+        return
+      else
+        @log.info &.emit("Queue Job", step: @job_config.to_json)
+      end
+
       NomadJob.new(
         pr: @pr,
         raw: @raw,
