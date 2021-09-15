@@ -50,9 +50,7 @@
   outputs = { self, ... }@inputs:
     let
       overlay = final: prev: {
-        bitte-ci = import ./pkgs/bitte-ci {
-          inherit (final) lib callPackage pkgsStatic pkgsMusl;
-        };
+        bitte-ci = final.callPackage ./pkgs/bitte-ci { };
 
         iogo = inputs.iogo.defaultPackage.${prev.system};
 

@@ -1,6 +1,7 @@
-{ lib, callPackage, pkgsStatic, pkgsMusl }:
+{ lib, callPackage, pkgsStatic, pkgsMusl, symlinkJoin }:
 let
-  cmds = [ "bitte-ci" "command" "listen" "migrate" "prepare" "queue" "server" ];
+  commandNames =
+    [ "bitte-ci" "command" "listen" "migrate" "prepare" "queue" "server" ];
 
   mkBitte = name: main:
     callPackage ./package.nix { extraArgs = { inherit main name; }; };
@@ -15,13 +16,26 @@ let
         static = true;
       };
     };
-in builtins.listToAttrs (builtins.concatLists (map (name: [
-  {
+
+  static = builtins.listToAttrs (map (name: {
     name = "${name}-static";
     value = mkBitteStatic name "src/bitte_ci/cli/${name}.cr";
-  }
-  {
+  }) commandNames);
+
+  dynamic = builtins.listToAttrs (map (name: {
     inherit name;
     value = mkBitte name "src/bitte_ci/cli/${name}.cr";
-  }
-]) cmds))
+  }) commandNames);
+
+  compilations = {
+    static-all = symlinkJoin {
+      name = "bitte-ci-all";
+      paths = builtins.attrValues static;
+    };
+
+    dynamic-all = symlinkJoin {
+      name = "bitte-ci-all";
+      paths = builtins.attrValues dynamic;
+    };
+  };
+in static // dynamic // compilations
