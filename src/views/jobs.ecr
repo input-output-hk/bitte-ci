@@ -1,0 +1,18 @@
+<table class="table">
+  <tr>
+    <td>ID</td>
+    <td>Name</td>
+    <td>Datacenters</td>
+    <td>Type</td>
+    <td>Status</td>
+  </tr>
+  <% jobs.each do |job| %>
+    <tr>
+      <td><%= h job.id %></td>
+      <td><%= h job.name %></td>
+      <td><%= h job.datacenters.join(", ") %></td>
+      <td><%= h job.job_type %></td>
+      <td><%= h job.status %></td>
+    </tr>
+  <% end %>
+</table>

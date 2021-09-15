@@ -13,6 +13,11 @@
     arion.url = "github:hercules-ci/arion";
     inclusive.url = "github:input-output-hk/nix-inclusive";
     bitte.url = "github:input-output-hk/bitte";
+    iogo = {
+      url = "github:input-output-hk/bitte-iogo";
+      inputs.devshell.follows = "devshell";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     # requires this PR https://github.com/NixOS/nix/pull/5082
     nix.url = "github:NixOS/nix";
@@ -48,6 +53,8 @@
         bitte-ci = import ./pkgs/bitte-ci {
           inherit (final) lib callPackage pkgsStatic pkgsMusl;
         };
+
+        iogo = inputs.iogo.defaultPackage.${prev.system};
 
         nix = inputs.nix.packages.${prev.system}.nix;
 
@@ -262,6 +269,7 @@
             reproxy
             ngrok
             kcov
+            iogo
 
             pkg-config
             fd

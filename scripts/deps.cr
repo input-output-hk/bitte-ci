@@ -33,7 +33,7 @@ Dir.glob(Path.new(srcdir, "src", "bitte_ci", "cli", "*")) do |cmd|
 
   pp! found
 
-  inputs = found.map { |f| f.relative_to(srcdir / "pkgs/bitte-ci") }
+  inputs = found.map(&.relative_to(srcdir / "pkgs/bitte-ci"))
 
   file = %([ #{inputs.sort.join(" ")} ])
   formatted = IO::Memory.new

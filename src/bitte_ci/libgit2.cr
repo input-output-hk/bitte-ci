@@ -409,7 +409,7 @@ module Git
   def self.init
     LibGit.git_libgit2_init
     LibGit.git_libgit2_opts(
-      LibGit::Opt::SetSslCertLocations, 
+      LibGit::Opt::SetSslCertLocations,
       ENV["SSL_CERT_FILE"],
       nil
     )
@@ -468,7 +468,7 @@ module Git
       boxed_submodule_update_options = Box.box(submodule_update_options)
       LibGit.git_submodule_foreach(
         @repo,
-        ->(submodule, name, payload) {
+        ->(submodule, _name, payload) {
           v = Box(LibGit::SubmoduleUpdateOptions).unbox(payload)
           Helper.check(LibGit.git_submodule_update(submodule, 1, pointerof(v)))
           LibC::Int.new(0)
@@ -480,7 +480,7 @@ module Git
     def fetch_submodules
       LibGit.git_submodule_foreach(
         @repo,
-        ->(submodule, name, payload) {
+        ->(submodule, _name, _payload) {
           Helper.check(LibGit.git_submodule_update(submodule, 1, nil))
           LibC::Int.new(0)
         },
@@ -570,6 +570,39 @@ module Git
     end
   end
 
+  def self.credentials_ssh(credential, url, url_user, payload)
+    user = payload.ssh_user || url_user || "git"
+
+    res = LibGit.git_credential_ssh_key_from_agent(
+      credential,
+      user,
+    )
+
+    if res != 0
+      check(LibGit.git_credential_ssh_key_new(
+        credential,
+        user,
+        payload.ssh_public_path,
+        payload.ssh_private_path,
+        payload.ssh_passphrase,
+      ))
+    end
+  end
+
+  def self.credentials_userpass(credential, url, url_user, payload)
+    https_username = payload.https_username || url_user
+    raise "HTTPS username is missing" unless https_username
+
+    https_password = payload.https_password
+    raise "HTTPS password is missing" unless https_password
+
+    check(LibGit.git_credential_userpass_plaintext_new(
+      credential,
+      https_username,
+      https_password
+    ))
+  end
+
   def self.credentials(
     credential : LibGit::Credential**,
     url : String,
@@ -579,34 +612,9 @@ module Git
   )
     case
     when allowed_types & LibGit::GitCredential::SshKey == LibGit::GitCredential::SshKey
-      user = payload.ssh_user || url_user || "git"
-
-      res = LibGit.git_credential_ssh_key_from_agent(
-        credential,
-        user,
-      )
-
-      if res != 0
-        check(LibGit.git_credential_ssh_key_new(
-          credential,
-          user,
-          payload.ssh_public_path,
-          payload.ssh_private_path,
-          payload.ssh_passphrase,
-        ))
-      end
+      credentials_ssh(credential, url, url_user, payload)
     when allowed_types & LibGit::GitCredential::UserpassPlaintext == LibGit::GitCredential::UserpassPlaintext
-      https_username = payload.https_username || url_user
-      raise "HTTPS username is missing" unless https_username
-
-      https_password = payload.https_password
-      raise "HTTPS password is missing" unless https_password
-
-      check(LibGit.git_credential_userpass_plaintext_new(
-        credential,
-        https_username,
-        https_password
-      ))
+      credentials_userpass(credential, url, url_user, payload)
     when allowed_types & LibGit::GitCredential::SshCustom == LibGit::GitCredential::SshCustom
       raise "Unsupported: LibGit::GitCredential::SshCustom"
     when allowed_types & LibGit::GitCredential::Default == LibGit::GitCredential::Default

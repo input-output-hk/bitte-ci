@@ -73,9 +73,9 @@ module BitteCI
         in MsgChannel::PullRequest
           respond(id) { |i| on_pull_request(i) }
         in MsgChannel::Build
-          respond(msg.uuid) { |i| on_build(i) }
+          respond(uuid) { |i| on_build(i) }
         in MsgChannel::Allocation
-          respond(msg.uuid) { |i| on_alloc(i) }
+          respond(uuid) { |i| on_alloc(i) }
         end
       end
     end

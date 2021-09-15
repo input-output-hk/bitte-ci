@@ -19,18 +19,19 @@ module BitteCI
 
     @loki_base_url : URI
     @labels : Hash(String, String) = {} of String => String
-    @obfuscate : Array(String)
+    @obfuscate : Regex
 
     def self.new(loki_base_url)
       new(loki_base_url, {} of String => String)
     end
 
-    def initialize(@loki_base_url, @labels, @obfuscate)
+    def initialize(@loki_base_url, @labels, obfuscate)
       @inbox = Channel(Value).new
       @timer = Channel(Time).new(0)
       @done = Channel(Nil).new
       @stopping = false
       @log = ::Log.for("Loki")
+      @obfuscate = Regex.union(obfuscate)
     end
 
     def start
@@ -47,7 +48,7 @@ module BitteCI
     end
 
     def stop
-      @log.info { "stop" }
+      @log.info { "stopping Loki exporter" }
       @inbox.close
       @timer.close
       @stopping = true
@@ -110,7 +111,7 @@ module BitteCI
 
     def push(collected : Array(Value))
       return if collected.empty?
-      @log.info &.emit("push", collected: collected.size)
+      @log.debug &.emit("push", collected: collected.size)
 
       grouped = collected.group_by do |coll|
         coll.labels
@@ -134,7 +135,7 @@ module BitteCI
 
       case res.status
       when HTTP::Status::NO_CONTENT
-        @log.info &.emit("push", response: res.inspect)
+        @log.debug &.emit("push", response: res.inspect)
       when HTTP::Status::IM_A_TEAPOT
         @log.info { "Kettle boiling over!" }
       else
@@ -145,9 +146,7 @@ module BitteCI
     end
 
     def log(text : String, labels : Hash(String, String) = @labels)
-      @obfuscate.each do |obfuscate_string|
-        text = text.gsub(obfuscate_string, "******")
-      end
+      text = text.gsub(@obfuscate, "******")
       merged_labels = @labels.merge(labels)
       @log.debug &.emit(text: text, labels: merged_labels)
       @log.info { text }

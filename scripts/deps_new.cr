@@ -10,14 +10,14 @@ def collect(path, found : Set(Path)) : Nil
       line.split(",").each do |part|
         case part
         when /"([^"]+\.ecr)"/
-          found << Path.new($1)
+          Dir.glob($1.gsub(/\{\{tmpl\.id\}\}/, "*")) { |p| found << Path[p] }
         when /read_file "([^"]+)"/
-          found << Path.new($1)
+          found << Path[$1]
         when /^require\s+"(\.[^"]+)"/
           normal = (path.parent/"#{$1}.cr").normalize
           found << normal if File.exists?(normal)
           Dir.glob(normal) { |inner|
-            collect(Path.new(inner), found)
+            collect(Path[inner], found)
           }
         end
       end
@@ -30,7 +30,7 @@ end
 srcdir = Path.posix(__DIR__)
 
 Dir.glob("src/bitte_ci/cli/*.cr") do |cli|
-  path = Path.new(cli)
+  path = Path[cli]
   Log.info { "Collecting dependencies for #{cli}" }
   found = Set(Path).new
   collect(path, found)
@@ -39,7 +39,7 @@ Dir.glob("src/bitte_ci/cli/*.cr") do |cli|
 
   pp! found
 
-  inputs = found.map { |f| (Path.new(__DIR__) / f).relative_to(srcdir / "pkgs/bitte-ci") }
+  inputs = found.map { |f| (Path[__DIR__] / f).relative_to(srcdir / "pkgs/bitte-ci") }
 
   file = %([ #{inputs.sort.join(" ")} ])
   formatted = IO::Memory.new

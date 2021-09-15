@@ -5,6 +5,7 @@ require "pg"
 require "./uuid"
 require "./simple_config"
 require "./line"
+require "./model"
 
 module BitteCI
   class Listener
@@ -40,6 +41,9 @@ module BitteCI
       @[Option(help: "Base URL under which this server is reachable e.g. http://example.com")]
       property public_url : URI
 
+      @[Option(help: "Index to start listening from (comes from db by default)")]
+      property index : UInt64?
+
       def run(log)
         Listener.new(log, self).run
       end
@@ -52,20 +56,25 @@ module BitteCI
 
     # TODO: refactor to use Clear
     def run
-      DB.open(config.postgres_url.to_s) do |db|
-        index = 0i64
+      Clear::SQL.init(config.postgres_url.to_s)
 
-        db.query "SELECT COALESCE(MAX(index), 0) from allocations;" do |rs|
-          rs.each do
-            index = rs.read(Int64) + 1
+      DB.open(config.postgres_url.to_s) do |db|
+        index = 0u64
+
+        if config.index
+          index = config.index.not_nil!
+        else
+          db.query "SELECT COALESCE(MAX(index), 0) from allocations;" do |rs|
+            rs.each do
+              index = rs.read(Int64)
+            end
           end
         end
 
         nomad_url = config.nomad_base_url.dup
         nomad_url.path = "/v1/event/stream"
         nomad_url.query = URI::Params.new({
-          "topic" => ["Allocation"],
-          "index" => [index.to_s],
+          "index" => [(index + 1).to_s],
         }).to_s
 
         headers = HTTP::Headers{
@@ -75,57 +84,43 @@ module BitteCI
         context = ssl_context(config) if nomad_url.scheme == "https"
 
         loop do
-          HTTP::Client.get(nomad_url, headers: headers, tls: context) do |res|
-            res.body_io.each_line { |line| handle_line(db, line) }
-          end
+          listen(db, nomad_url, headers, context)
+          sleep 1
         end
       end
     end
 
+    def listen(db, nomad_url, headers, context)
+      HTTP::Client.get(nomad_url, headers: headers, tls: context) do |res|
+        res.body_io.each_line { |line| handle_line(db, line) }
+      end
+    rescue e : IO::EOFError | Socket::ConnectError
+      log.error &.emit("Connection to Nomad lost", error: e.inspect)
+    end
+
     def handle_line(db, line)
       return if line == "{}"
-      return if line == "subscription closed by server, client should resubscribe"
+      return unless line.starts_with?("{")
+
       j = Line.from_json(line)
       j.events.each do |event|
-        next unless event.is_a?(Allocation)
-
-        db.transaction do
-          id = event.payload.allocation.id
-          eval_id = event.payload.allocation.eval_id
-          status = event.payload.allocation.client_status
-
-          log.info { "Updating allocation #{id} with #{status}" }
-
-          db.exec <<-SQL, id, eval_id, j.index, status, event.payload.to_json
-            INSERT INTO allocations
-              (id, eval_id, index, client_status, data, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-            ON CONFLICT (id) DO
-              UPDATE SET index = $3, updated_at = NOW(), client_status = $4, data = $5;
-          SQL
-
-          db.exec "SELECT pg_notify($1, $2)", "allocations", id
-
-          case status
-          when "failed", "complete"
-            db.exec <<-SQL, eval_id, status
-              UPDATE builds
-                SET build_status = $2, updated_at = NOW(), finished_at = NOW()
-                WHERE id = $1 AND build_status != $2;
-            SQL
-          else
-            db.exec <<-SQL, eval_id, status
-              UPDATE builds
-                SET build_status = $2, updated_at = NOW()
-                WHERE id = $1 AND build_status != $2;
-            SQL
-          end
-
-          db.exec "SELECT pg_notify($1, $2)", "builds", eval_id
+        case event
+        when Allocation
+          handle_allocation(db, event, j.index)
+        when Evaluation
+          handle_evaluation(db, event, j.index)
+        when Job
+          handle_job(db, event, j.index)
+        when Node
+          handle_node(db, event, j.index)
+        else
+          log.error &.emit("Couldn't parse line, stored as line_unknown.json")
+          File.write("line_unknown.json", line)
         end
       end
-    rescue e : JSON::ParseException
-      log.error &.emit("Couldn't parse line, stored as line.json", error: e.inspect)
-      File.write("line.json", line)
+    rescue e : JSON::ParseException | ArgumentError | IO::EOFError | Socket::ConnectError
+      log.error &.emit("Couldn't parse line, stored as line_error.json", error: e.inspect)
+      File.write("line_error.json", line)
     end
 
     def ssl_context(config)
@@ -134,6 +129,125 @@ module BitteCI
         "cert" => config.nomad_ssl_cert,
         "key"  => config.nomad_ssl_key,
       })
+    end
+
+    def handle_node(db, event : Node, index)
+      node = event.payload.node
+      File.write("node_event.json", node.to_json)
+
+      db.transaction do
+        log.info { "Updating node #{node.id}" }
+
+        db.exec <<-SQL, node.id, event.payload.to_json
+          INSERT INTO nodes
+            (id, created_at, updated_at, data) VALUES ($1, NOW(), NOW(), $2)
+          ON CONFLICT (id) DO
+            UPDATE SET data = $2, updated_at = NOW()
+        SQL
+      end
+    end
+
+    def handle_evaluation(db, event : Evaluation, index)
+      eval = event.payload.evaluation
+      File.write("evaluation_event.json", eval.to_json)
+
+      db.transaction do
+        log.info { "Updating evaluation #{eval.id} with #{eval.status}" }
+
+        db.exec <<-SQL, eval.id, eval.job_id, eval.status, eval.create_time, eval.modify_time
+          INSERT INTO evaluations
+            (id, job_id, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (id) DO
+            UPDATE SET status = $3, updated_at = $5
+        SQL
+      end
+    end
+
+    def handle_job(db, event : Job, index)
+      job = event.payload.job
+      File.write("evaluation_event.json", job.to_json)
+
+      db.transaction do
+        log.info { "Updating job #{job.id}" }
+
+        db.exec <<-SQL, job.id, job.submit_time, event.payload.to_json
+          INSERT INTO jobs
+            (id, created_at, updated_at, data) VALUES ($1, $2, NOW(), $3)
+          ON CONFLICT (id) DO
+            UPDATE SET data = $3, updated_at = NOW()
+        SQL
+      end
+    end
+
+    def handle_allocation(db, event : Allocation, index)
+      alloc = event.payload.allocation
+      File.write("allocation_event.json", alloc.to_json)
+
+      db.transaction do
+        log.info { "Updating allocation #{alloc.id} with #{alloc.client_status}" }
+
+        pr_id = 0i64
+        job_id = alloc.job_id
+
+        db.query "SELECT (data->'Job'->'Meta'->>'pull_request_id')::bigint from jobs WHERE id = $1;", job_id do |rs|
+          rs.each do
+            pr_id = rs.read(Int64)
+          end
+        end
+
+        old_alloc = ::Allocation.query.where { var("id") == alloc.id }.first
+
+        if old_alloc
+          changed = false
+
+          old_alloc.parsed.allocation.task_states.try &.each do |old_name, old_state|
+            alloc.task_states.try &.each do |new_name, new_state|
+              next if old_name != new_name
+              next if new_state.failed == old_state.failed && new_state.state == old_state.state
+
+              changed = true
+            end
+          end
+
+          old_alloc.update(
+            index: index.to_i64,
+            updated_at: Time.utc,
+            client_status: alloc.client_status,
+            data: JSON.parse(event.payload.to_json),
+          )
+
+          db.exec("SELECT pg_notify($1, $2)", "allocations", alloc.id) if changed
+        else
+          new_alloc = ::Allocation.create(
+            id: alloc.id,
+            eval_id: alloc.eval_id,
+            job_id: alloc.job_id,
+            pr_id: pr_id,
+            index: index,
+            client_status: alloc.client_status,
+            data: event.payload.to_json
+          )
+
+          db.exec "SELECT pg_notify($1, $2)", "allocations", alloc.id
+        end
+
+        case alloc.client_status
+        when "failed", "complete"
+          db.exec <<-SQL, alloc.eval_id, alloc.client_status
+            UPDATE builds
+              SET build_status = $2, updated_at = NOW(), finished_at = NOW()
+              WHERE id = $1 AND build_status != $2;
+          SQL
+        else
+          db.exec <<-SQL, alloc.eval_id, alloc.client_status
+            UPDATE builds
+              SET build_status = $2, updated_at = NOW()
+              WHERE id = $1 AND build_status != $2;
+          SQL
+        end
+
+        db.exec "SELECT pg_notify($1, $2)", "builds", alloc.eval_id
+      end
     end
   end
 end

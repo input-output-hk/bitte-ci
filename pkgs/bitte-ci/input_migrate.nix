@@ -1,6 +1,7 @@
 [
   ../../src/bitte_ci/cli.cr
   ../../src/bitte_ci/cli/migrate.cr
+  ../../src/bitte_ci/github_hook.cr
   ../../src/bitte_ci/line.cr
   ../../src/bitte_ci/migrator.cr
   ../../src/bitte_ci/model.cr

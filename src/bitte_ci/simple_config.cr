@@ -288,7 +288,7 @@ class String
     if self[0]? == '{'
       Hash(String, String).from_json(self)
     else
-      split(' ').map { |pair| pair.split("=") }.to_h
+      split(' ').map(&.split("=")).to_h
     end
   end
 end

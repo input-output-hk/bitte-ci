@@ -6,6 +6,9 @@ require "./uuid"
 require "./job_config"
 require "./simple_config"
 require "./github_hook"
+require "./nomad_job"
+require "./graph"
+require "./model"
 
 Second = 1_000_000_000u64
 Minute = Second * 60
@@ -116,10 +119,60 @@ module BitteCI
     end
 
     def run
-      @log.info &.emit("Queue Job", step: @job_config.to_json)
+      Clear::SQL.init(@config.postgres_url.to_s)
 
-      if @job_config.ci.steps.empty?
-        @log.info &.emit("Skip Job because steps are empty", step: @job_config.to_json)
+      @log.info &.emit("Generating Job", step: @job_config.to_json)
+
+      pp! ::PullRequest.query
+        .where { var("id") == @pr.id }
+        .find_or_create(id: @pr.id, data: @pr.to_json)
+
+      @job_config.ci.steps.each do |_key, step|
+        step.after = ["prepare"] if step.after.empty?
+      end
+
+      @job_config.ci.steps["prepare"] = JobConfig::Step.new(
+        label: "Git checkout to /alloc/repo",
+        flakes: {@config.runner_flake.to_s => ["prepare-static"]},
+        command: ["bitte-ci-prepare"],
+        enable: true,
+        vault: false,
+        cpu: 3000u32,
+        memory: 3u32 * 1024,
+        lifecycle: "prestart",
+        sidecar: false,
+      )
+
+      groups = calculate_graph
+      run_graph(groups)
+    end
+
+    def calculate_graph
+      graph = Graph::Directed.new
+
+      vertices = {} of String => Graph::Node
+
+      @job_config.ci.steps.each do |key, _step|
+        vertices[key] = graph.add_vertex(key)
+      end
+
+      @job_config.ci.steps.each do |key, step|
+        step.after.each do |after|
+          graph.add_edge(vertices[after], vertices[key], 1)
+        end
+      end
+
+      dijkstras = Graph::Dijkstras.new(graph, vertices["prepare"])
+
+      @job_config.ci.steps.compact_map { |key, _step|
+        next if key == "prepare"
+        dijkstras.shortest_path(vertices["prepare"], vertices[key])
+      }
+    end
+
+    def run_graph(groups)
+      if @job_config.ci.enabled_steps.size <= 1
+        @log.info &.emit("Skip Job because steps are empty")
         return
       else
         @log.info &.emit("Queue Job", step: @job_config.to_json)
@@ -130,6 +183,7 @@ module BitteCI
         raw: @raw,
         job_config: @job_config,
         config: @config.for_nomad_job,
+        groups: groups,
       ).queue!
     end
 
@@ -143,7 +197,6 @@ module BitteCI
       File.write(pr_tmp_schema, {{ read_file "cue/schema.cue" }}) # this is read at compile time
       File.write(pr_tmp_ci, @ci_cue)
 
-      pr_cue_mem = IO::Memory.new
       status = Process.run("cue", output: STDOUT, error: STDERR,
         args: ["import", "json", "-p", "ci", "-o", pr_tmp_cue, pr_tmp_json])
       raise "Failed to import JSON to CUE. Exited with: #{status.exit_status}" unless status.success?
@@ -153,7 +206,7 @@ module BitteCI
         args: ["export", pr_tmp_schema, pr_tmp_cue, pr_tmp_ci])
       raise "Failed to export CUE to JSON. Exited with: #{status.exit_status}" unless status.success?
 
-      Log.info { "Exported CUE" }
+      @log.info { "Exported CUE" }
 
       JobConfig.from_json(mem.to_s)
     ensure
@@ -209,273 +262,5 @@ module BitteCI
 
     @[JSON::Field(key: "Warnings")]
     property warnings : String
-  end
-
-  class NomadJob
-    struct Config
-      getter nomad_datacenters, nomad_base_url, nomad_ssl_ca, nomad_ssl_cert,
-        nomad_ssl_key, runner_flake, loki_base_url, nomad_token, postgres_url,
-        public_url, artifact_secret, github_user, github_token
-
-      def initialize(
-        @nomad_datacenters : Array(String),
-        @nomad_base_url : URI,
-        @nomad_ssl_ca : String?,
-        @nomad_ssl_key : String?,
-        @nomad_ssl_cert : String?,
-        @runner_flake : URI,
-        @loki_base_url : URI,
-        @nomad_token : String,
-        @postgres_url : URI,
-        @public_url : URI,
-        @artifact_secret : String,
-        @github_user : String,
-        @github_token : String
-      )
-      end
-    end
-
-    def initialize(
-      @pr : GithubHook::PullRequest,
-      @raw : String,
-      @job_config : JobConfig,
-      @config : NomadJob::Config
-    )
-      @loki_id = UUID.random
-    end
-
-    def queue!
-      post = post_job!
-
-      Log.debug &.emit("NomadJob#queue!", post: post.inspect)
-
-      DB.open(@config.postgres_url) do |db|
-        db.transaction do
-          db.exec <<-SQL, @pr.id, @raw
-            INSERT INTO pull_requests (id, data) VALUES ($1, $2)
-            ON CONFLICT (id) DO UPDATE SET data = $2;
-          SQL
-
-          db.exec "SELECT pg_notify($1, $2)", "pull_requests", @pr.id
-
-          db.exec <<-SQL, post.eval_id, @pr.id, @loki_id, Time.utc, "pending"
-            INSERT INTO builds
-            (id, pr_id, loki_id, created_at, build_status)
-            VALUES
-            ($1, $2, $3, $4, $5);
-          SQL
-
-          db.exec "SELECT pg_notify($1, $2)", "builds", post.eval_id
-        end
-      end
-    end
-
-    def post_job!
-      Log.info { "Submitting job to Nomad" }
-
-      nomad_url = @config.nomad_base_url.dup
-      nomad_url.path = "/v1/jobs"
-
-      res = HTTP::Client.post(
-        nomad_url,
-        tls: (ssl_context if nomad_url.scheme == "https"),
-        body: rendered.to_json,
-        headers: headers,
-      )
-
-      case res.status
-      when HTTP::Status::OK
-        NomadJobPost.from_json(res.body)
-      else
-        raise "HTTP Error while trying to POST nomad job to #{nomad_url} : #{res.status.to_i} #{res.status_message}"
-      end
-    end
-
-    def ssl_context
-      OpenSSL::SSL::Context::Client.from_hash({
-        "ca"   => @config.nomad_ssl_ca,
-        "cert" => @config.nomad_ssl_cert,
-        "key"  => @config.nomad_ssl_key,
-      })
-    end
-
-    def headers
-      HTTP::Headers{
-        "X-Nomad-Token" => [@config.nomad_token],
-      }
-    end
-
-    def rendered
-      {Job: job}
-    end
-
-    def job_id
-      "#{@pr.base.repo.full_name}##{@pr.number}-#{@pr.head.sha}"
-    end
-
-    def job_name
-      job_id
-    end
-
-    def task_group_name
-      job_id
-    end
-
-    def job
-      {
-        Namespace:   nil,
-        ID:          job_id,
-        Name:        job_name,
-        Type:        "batch",
-        Priority:    40,
-        Datacenters: @config.nomad_datacenters,
-        TaskGroups:  [
-          {
-            Name:             "steps",
-            Count:            1,
-            Tasks:            tasks,
-            ReschedulePolicy: {
-              Attempts:      3,
-              DelayFunction: "exponential",
-              Delay:         Second * 10,
-              Interval:      Minute * 1,
-              MaxDelay:      Minute * 10,
-              Unlimited:     false,
-            },
-            EphemeralDisk: {
-              SizeMB:  1024,
-              Migrate: false,
-              Sticky:  false,
-            },
-            Networks: [{Mode: "host"}],
-          },
-        ],
-      }
-    end
-
-    def tasks
-      default = @job_config.ci.steps.select do |name, step_config|
-        step_config.enable
-      end
-
-      prepare_config.merge(default).map do |name, step_config|
-        Task.new(@pr, name, step_config, @config, @loki_id)
-      end
-    end
-
-    class Task
-      def initialize(
-        @pr : GithubHook::PullRequest,
-        @name : String,
-        @config : JobConfig::Step,
-        @job_config : Config,
-        @loki_id : UUID
-      )
-      end
-
-      # combine the required dependencies for the runner.sh with
-      def dependencies
-        deps = %w[cacert command-static].map { |a| "#{@job_config.runner_flake}##{a}" }
-        original = @config.flakes.flat_map { |k, vs| vs.map { |v| "#{k}##{v}" } }
-        (deps + original).uniq
-      end
-
-      def definition
-        command = [@config.command].flatten
-        args = command.size > 1 ? command[1..-1] : [] of String
-
-        obfuscate = [@job_config.github_token]
-
-        {
-          Name:   @name,
-          Driver: "exec",
-
-          Config: {
-            flake_deps: dependencies,
-            command:    "/bin/bitte-ci-command",
-            args:       [
-              "--name", @name,
-              "--command", command[0],
-              "--args", args.to_json,
-              "--obfuscate", obfuscate.to_json,
-              "--loki-base-url", @job_config.loki_base_url.to_s,
-              "--public-url", @job_config.public_url.to_s,
-              "--after", @config.after.to_json,
-              "--outputs", @config.outputs.to_json,
-              "--bitte-ci-id", @loki_id,
-              "--artifact-secret", @job_config.artifact_secret,
-            ],
-          },
-
-          Env: {
-            "PATH"          => "/bin",
-            "SSL_CERT_FILE" => "/current-alloc/etc/ssl/certs/ca-bundle.crt",
-            "SHA"           => @pr.head.sha,
-            "CLONE_URL"     => @pr.head.repo.clone_url,
-            "PR_NUMBER"     => @pr.number.to_s,
-            "LABEL"         => @pr.head.label,
-            "REF"           => @pr.head.ref,
-            "FULL_NAME"     => @pr.base.repo.full_name,
-            "GITHUB_USER"   => @job_config.github_user,
-            "GITHUB_TOKEN"  => @job_config.github_token,
-            # "GIT_TRACE"        => "2",
-            # "GIT_CURL_VERBOSE" => "2",
-          }.merge(@config.env),
-
-          ShutdownDelay: 0,
-          KillSignal:    "SIGTERM",
-
-          Resources: {
-            CPU:      @config.cpu,
-            MemoryMB: @config.memory,
-          },
-
-          RestartPolicy: {
-            Interval: Second * 60,
-            Attempts: 5,
-            Delay:    Second * 60,
-            Mode:     "delay",
-          },
-
-          Templates: [
-            {
-              DestPath:     "local/pr.json",
-              EmbeddedTmpl: @pr.to_json,
-            },
-          ],
-
-          Vault: if @config.vault
-            {
-              ChangeMode: "noop",
-              Env:        true,
-              Policies:   ["nomad-cluster"],
-            }
-          end,
-
-          Lifecycle: {Hook: @config.lifecycle},
-          Sidecar:   @config.sidecar,
-        }
-      end
-
-      def to_json(b)
-        definition.to_json(b)
-      end
-    end
-
-    def prepare_config
-      {
-        "prepare" => JobConfig::Step.new(
-          label: "Git checkout to /alloc/repo",
-          flakes: {@config.runner_flake.to_s => ["prepare-static"]},
-          command: ["bitte-ci-prepare"],
-          enable: true,
-          vault: false,
-          cpu: 3000u32,
-          memory: 3u32 * 1024,
-          lifecycle: "prestart",
-          sidecar: false,
-        ),
-      }
-    end
   end
 end

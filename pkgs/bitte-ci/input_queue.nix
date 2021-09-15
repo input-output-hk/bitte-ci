@@ -3,8 +3,13 @@
   ../../src/bitte_ci/cli.cr
   ../../src/bitte_ci/cli/queue.cr
   ../../src/bitte_ci/github_hook.cr
+  ../../src/bitte_ci/graph.cr
   ../../src/bitte_ci/job_config.cr
+  ../../src/bitte_ci/line.cr
+  ../../src/bitte_ci/model.cr
+  ../../src/bitte_ci/nomad_job.cr
   ../../src/bitte_ci/runner.cr
   ../../src/bitte_ci/simple_config.cr
+  ../../src/bitte_ci/time.cr
   ../../src/bitte_ci/uuid.cr
 ]

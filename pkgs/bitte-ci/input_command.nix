@@ -5,7 +5,6 @@
   ../../src/bitte_ci/commander.cr
   ../../src/bitte_ci/libgit2.cr
   ../../src/bitte_ci/loki.cr
-  ../../src/bitte_ci/magic.cr
   ../../src/bitte_ci/simple_config.cr
   ../../src/bitte_ci/time.cr
   ../../src/bitte_ci/uuid.cr

@@ -1,0 +1,22 @@
+<table class="table">
+  <tr>
+    <td>ID</td>
+    <td>Name</td>
+    <td>Task Group</td>
+    <td>Status</td>
+    <td>Description</td>
+    <td>Job</td>
+    <td>Node</td>
+  </tr>
+  <% allocs.each do |alloc| %>
+    <tr>
+      <td><%= h alloc.id %></td>
+      <td><%= h alloc.name %></td>
+      <td><%= h alloc.task_group %></td>
+      <td><%= h alloc.client_status %></td>
+      <td><%= h alloc.client_description %></td>
+      <td><a href="/job/<%= h alloc.job_id %>"><%= h alloc.job_id %></a></td>
+      <td><a href="/node/<%= h alloc.node_id %>"><%= h alloc.node_name %></a></td>
+    </tr>
+  <% end %>
+</table>

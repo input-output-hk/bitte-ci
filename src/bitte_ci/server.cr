@@ -123,10 +123,10 @@ module BitteCI
 
     macro not_found
       title = "Not Found"
-      halt env, status_code: 404, response: render("src/views/404.ecr", "src/views/layout.ecr")
+      halt env, status_code: 404, response: lrender("404")
     end
 
-    def h(event : Listener::AllocationPayloadAllocation::TaskStates::Event)
+    def h(event : Listener::AllocationPayload::Allocation::TaskStates::Event)
       if event.details.empty?
         h event.display_message
       else
@@ -142,6 +142,14 @@ module BitteCI
       ""
     end
 
+    def h(n : UUID)
+      n.to_s
+    end
+
+    macro lrender(tmpl)
+      render "src/views/{{tmpl.id}}.ecr", "src/views/layout.ecr"
+    end
+
     def run
       Clear::SQL.init(config.postgres_url.to_s)
 
@@ -152,7 +160,7 @@ module BitteCI
 
       error 404 do
         title = "Not Found"
-        render("src/views/404.ecr", "src/views/layout.ecr")
+        lrender "404"
       end
 
       ws "/ci/api/v1/socket" do |socket|
@@ -161,12 +169,15 @@ module BitteCI
 
       get "/" do
         title = "Bitte CI"
-        prs = PullRequest.query.to_a.sort_by { |pr| pr.created_at }
-        render "src/views/index.ecr", "src/views/layout.ecr"
+        # ameba:disable Lint/UselessAssign
+        prs = PullRequest.query.to_a.sort_by(&.created_at)
+        lrender "index"
       end
 
       get "/about" do
         markdown = Markd.to_html({{ read_file "README.md" }})
+
+        # ameba:disable Lint/UselessAssign
         content = <<-HTML
           <div class="about container">
             #{markdown}
@@ -176,11 +187,29 @@ module BitteCI
         render "src/views/layout.ecr"
       end
 
+      get "/nodes" do |env|
+        nodes = Node.query.map(&.parsed.node)
+        title = "Nodes"
+        lrender "nodes"
+      end
+
+      get "/jobs" do |env|
+        jobs = Job.query.map(&.parsed.job)
+        title = "Jobs"
+        lrender "jobs"
+      end
+
+      get "/allocations" do |env|
+        allocs = Allocation.query.map(&.parsed.allocation)
+        title = "Allocations"
+        lrender "allocations"
+      end
+
       get "/pull_request/:id" do |env|
         pr = PullRequest.query.where { id == env.params.url["id"] }.first
         if pr
           title = "Pull Request ##{pr.number}"
-          render "src/views/pull_request.ecr", "src/views/layout.ecr"
+          lrender "pull_request"
         else
           not_found
         end
@@ -192,6 +221,7 @@ module BitteCI
 
         not_found unless build
 
+        # ameba:disable Lint/UselessAssign
         logs = Loki.query_range(
           config.loki_base_url,
           build.loki_id,
@@ -208,9 +238,11 @@ module BitteCI
 
         not_found unless alloc
 
+        # ameba:disable Lint/UselessAssign
         outputs = alloc.outputs
           .select(:id, :size, :created_at, :path, :mime, :sha256).to_a
 
+        # ameba:disable Lint/UselessAssign
         failing_alloc = alloc
           .parsed
           .allocation
@@ -221,7 +253,7 @@ module BitteCI
             }
           }
 
-        render "src/views/build.ecr", "src/views/layout.ecr"
+        lrender "build"
       end
 
       get "/api/v1/build" do |env|
@@ -296,18 +328,19 @@ module BitteCI
         obj =
           case n.channel
           when "builds"
-            build = Build.query.where { id == n.payload }.first
-            build.send_github_status(
-              user: config.github_user,
-              token: config.github_token,
-              target_url: config.public_url
-            ) if build
-            build
+            Build.query.where { id == n.payload }.first
           when "pull_requests"
             PullRequest.query.where { id == n.payload }.first
           when "allocations"
-            alloc = Allocation.query.where { id == n.payload }.first
-            alloc.simplify if alloc
+            if alloc = Allocation.query.where { id == n.payload }.first
+              pp! alloc.try(&.id)
+              alloc.send_github_status(
+                user: config.github_user,
+                token: config.github_token,
+                target_url: config.public_url,
+              )
+              alloc.simplify
+            end
           end
 
         channels.each { |c| c.send({"type" => n.channel, "value" => obj}.to_json) } if obj

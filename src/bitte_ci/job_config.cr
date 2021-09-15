@@ -11,6 +11,12 @@ module BitteCI
 
       property version : UInt8
       property steps : Hash(String, Step)
+
+      def enabled_steps
+        steps.select do |_, step_config|
+          step_config.enable
+        end
+      end
     end
 
     class Step

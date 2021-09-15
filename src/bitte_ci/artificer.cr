@@ -2,9 +2,9 @@ require "digest"
 require "openssl/hmac"
 require "crypto/subtle"
 require "file_utils"
+require "magic"
 
 require "./simple_config"
-require "./magic"
 
 module BitteCI
   class Artificer

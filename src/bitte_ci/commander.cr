@@ -115,8 +115,10 @@ module BitteCI
       end
     end
 
-    REPO_ALLOC = "/alloc/repo"
-    REPO_LOCAL = "/local/repo"
+    REPO_ALLOC = Path["/alloc/repo"]
+    REPO_TRANS = Path["/alloc/trans"]
+    REPO_LOCAL = Path["/local/repo"]
+    STATUS_DIR = Path["/alloc/.bitte-ci"]
 
     def initialize(@config : Config)
       @loki = Loki.new(@config.loki_base_url, @config.to_labels, @config.obfuscate)
@@ -127,44 +129,33 @@ module BitteCI
 
     def run
       status = @loki.run do
-        copy_repo
         pre_start
-
-        @loki.log "#{@config.command} #{@config.args.join(" ")}"
-        process = start_process
-
-        start_forwarder(process)
-        start_wait(process)
-        start_timeout(@config.term_timeout, Signal::TERM)
-        start_timeout(@config.kill_timeout, Signal::KILL)
-
-        @returned.receive
+        start
       end
 
-      FileUtils.mkdir_p(status_dir)
-      File.write(status_dir / @config.name, status.exit_status.to_s)
+      FileUtils.mkdir_p(STATUS_DIR)
+      File.write(STATUS_DIR / @config.name, status.exit_status.to_s)
 
       post_start if status.normal_exit? && status.success?
 
       exit status.exit_status
     end
 
-    def status_dir
-      Path.new("/alloc/.bitte-ci")
+    def start
+      @loki.log "#{@config.command} #{@config.args.join(" ")}"
+      process = start_process
+
+      start_forwarder(process)
+      start_wait(process)
+      start_timeout(@config.term_timeout, Signal::TERM)
+      start_timeout(@config.kill_timeout, Signal::KILL)
+
+      @returned.receive
     end
 
     def start_process
-      chdir = File.directory?(REPO_ALLOC) ? REPO_ALLOC : nil
+      chdir = File.directory?(REPO_ALLOC) ? REPO_ALLOC.to_s : nil
       @loki.sh(@config.command, @config.args, chdir)
-    end
-
-    def copy_repo
-      return unless File.directory?(REPO_ALLOC)
-      return if File.directory?(REPO_LOCAL)
-      Git.init
-      repo = Git.clone(REPO_ALLOC, REPO_LOCAL)
-      repo.reset(@config.sha)
-      repo.fetch_submodules
     end
 
     def pre_start
@@ -175,16 +166,28 @@ module BitteCI
           sleep 1
         end
 
-        dependency_status = Process::Status.new(File.read(status_dir/task_name).to_i)
+        dependency_status = Process::Status.new(File.read(STATUS_DIR/task_name).to_i)
 
         unless dependency_status.success?
           raise "Dependency #{task_name} failed with #{dependency_status.exit_status}"
         end
+
+        if File.directory?(REPO_LOCAL)
+          FileUtils.cp_r(REPO_TRANS.to_s, REPO_LOCAL.to_s)
+        end
+      end
+
+      unless File.exists?("/usr/bin/env")
+        FileUtils.mkdir_p("/usr/bin")
+        FileUtils.ln_s("/bin/env", "/usr/bin/env")
       end
     end
 
     def post_start
       Artificer.run(@config)
+      if File.directory?(REPO_LOCAL)
+        FileUtils.cp_r(REPO_LOCAL.to_s, REPO_TRANS.to_s)
+      end
     end
 
     def start_forwarder(process)

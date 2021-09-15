@@ -1,0 +1,24 @@
+<table class="table">
+  <tr>
+    <td>ID</td>
+    <td>Name</td>
+    <td>State</td>
+    <td>Address</td>
+    <td>Datacenter</td>
+    <td>CPU</td>
+    <td>Memory</td>
+    <td>Disk</td>
+  </tr>
+  <% nodes.each do |node| %>
+    <tr>
+      <td><%= h node.id %></td>
+      <td><%= h node.name %></td>
+      <td><%= h node.status %></td>
+      <td><%= h node.attributes.nomad_advertise_address %></td>
+      <td><%= h node.datacenter %></td>
+      <td><%= h node.resources.cpu.humanize %></td>
+      <td><%= h (node.resources.memory_mb * 1024 * 1024).humanize %></td>
+      <td><%= h (node.resources.disk_mb * 1024 * 1024).humanize %></td>
+    </tr>
+  <% end %>
+</table>

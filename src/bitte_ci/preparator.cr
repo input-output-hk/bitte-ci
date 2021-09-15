@@ -51,6 +51,8 @@ module BitteCI
         "Using commit #{@config.sha} from repo #{@config.clone_url}"
       }
 
+      return if File.directory?("/alloc/repo")
+
       Git.init
       cred = Git::Credentials.new(@config.github_user.to_s, @config.github_token.to_s)
       repo = Git.clone(@config.clone_url.to_s, "/alloc/repo", cred)

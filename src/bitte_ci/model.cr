@@ -1,6 +1,7 @@
 require "clear"
 require "./uuid"
 require "./line"
+require "./github_hook"
 
 Clear.enum BuildStatus, "pending", "running", "complete", "failed"
 
@@ -11,6 +12,14 @@ class PullRequest
   column data : JSON::Any
 
   has_many builds : Build, foreign_key: "pr_id"
+
+  @parsed : ::BitteCI::GithubHook::PullRequest?
+
+  # TODO: Optimize this (see https://github.com/anykeyh/clear/issues/95 )!
+  def parsed
+    @parsed ||=
+      ::BitteCI::GithubHook::PullRequest.from_json(pull_request.to_json)
+  end
 
   def job_id
     "#{base["repo"]["full_name"]}##{number}-#{sha}"
@@ -121,8 +130,10 @@ class Build
   column updated_at : Time?
   column finished_at : Time?
   column loki_id : UUID
+  column failed : Bool
 
   belongs_to pull_request : PullRequest, foreign_key: "pr_id", foreign_key_type: Int64
+  has_many jobs : Job, foreign_key: "build_id"
 
   def simplify
     {
@@ -154,43 +165,12 @@ class Build
     URI.parse(pull_request.data["pull_request"]["statuses_url"].as_s)
   end
 
-  # TODO: only send status if something changed
-  def send_github_status(user : String, token : String, target_url : URI)
-    description = "Nothing here yet..."
+  @parsed : ::BitteCI::GithubHook::PullRequest?
 
-    body = {
-      state:       step_to_state,
-      target_url:  target_url.dup.tap { |url| url.path = "/build/#{id}" },
-      description: description[0..138],
-      context:     "Bitte CI",
-    }
-
-    Log.info &.emit("sending github status",
-      state: body[:state],
-      target_url: body[:target_url].to_s,
-      description: body[:description])
-
-    uri = statuses_url
-    client = HTTP::Client.new(uri)
-    client.basic_auth user, token
-    res = client.post(
-      uri.path,
-      headers: HTTP::Headers{
-        "Accept" => "application/vnd.github.v3+json",
-      },
-      body: body.to_json,
-    )
-
-    case res.status
-    when HTTP::Status::CREATED
-      res
-    else
-      Log.error {
-        "HTTP Error while trying to POST github status to #{uri} : #{res.status.to_i} #{res.status_message}"
-      }
-    end
-  rescue e : Socket::ConnectError
-    Log.error &.emit(e.inspect, url: statuses_url.to_s)
+  # TODO: Optimize this (see https://github.com/anykeyh/clear/issues/95 )!
+  def parsed
+    @parsed ||=
+      ::BitteCI::GithubHook::PullRequest.from_json(pull_request.to_json)
   end
 end
 
@@ -206,6 +186,8 @@ class Allocation
   column data : JSON::Any
 
   has_many outputs : Output, foreign_key: "alloc_id"
+  belongs_to pull_request : PullRequest, foreign_key: "pr_id", foreign_key_type: Int64
+  belongs_to job : Job, foreign_key: "job_id", foreign_key_type: UUID
 
   @parsed : ::BitteCI::Listener::AllocationPayload?
 
@@ -227,6 +209,72 @@ class Allocation
       updated_at:    updated_at,
     }
   end
+
+  def statuses_url
+    URI.parse(pull_request.data["pull_request"]["statuses_url"].as_s)
+  end
+
+  def status_to_state : String
+    case client_status
+    when BuildStatus::Pending, BuildStatus::Running
+      "pending"
+    when BuildStatus::Complete
+      "success"
+    else
+      "failure"
+    end
+  end
+
+  # TODO: only send status if something changed
+  def send_github_status(user : String, token : String, target_url : URI)
+    alloc = parsed.allocation
+    pr = pull_request.parsed
+    state = status_to_state
+
+    common = {
+      user:       user,
+      token:      token,
+      state:      state,
+      target_url: target_url,
+    }
+
+    description = "pending"
+
+    case state
+    when "pending"
+      description = "builds pending"
+    when "success"
+      description = "builds succeeded"
+      alloc.task_states.try &.each do |name, state|
+        next if state.failed
+
+        pr.send_status(
+          **common,
+          description: "build succeeded",
+          context: "Bitte CI - #{name}"
+        )
+      end
+    when "failure"
+      description = "builds failed"
+
+      alloc.task_states.try &.each do |name, state|
+        next unless state.failed
+        pp! name, state.failed, state
+
+        pr.send_status(
+          **common,
+          description: "build failed",
+          context: "Bitte CI - #{name}"
+        )
+      end
+    end
+
+    pr.send_status(
+      **common,
+      description: description,
+      context: "Bitte CI"
+    )
+  end
 end
 
 class Output
@@ -244,5 +292,90 @@ class Output
 
   def inspect
     {id: id, created_at: created_at, alloc_id: alloc_id, size: size.humanize, path: path, mime: mime}.inspect
+  end
+end
+
+class Job
+  include Clear::Model
+
+  primary_key type: :uuid
+  column created_at : Time
+  column updated_at : Time
+  column data : JSON::Any
+
+  belongs_to build : Build, foreign_key: "alloc_id", foreign_key_type: UUID
+  has_many job_groups : JobGroup, foreign_key: "task_id"
+  has_many evaluations : Evaluation, foreign_key: "job_id"
+
+  @parsed : ::BitteCI::Listener::Job::JobPayload?
+
+  # TODO: Optimize this (see https://github.com/anykeyh/clear/issues/95 )!
+  def parsed
+    @parsed ||=
+      ::BitteCI::Listener::Job::JobPayload.from_json(data.to_json)
+  end
+end
+
+class Evaluation
+  include Clear::Model
+
+  primary_key type: :uuid
+  column job_id : String
+  column status : String
+  column created_at : Time
+  column updated_at : Time
+end
+
+class JobGroup
+  include Clear::Model
+
+  primary_key type: :uuid
+  column created_at : Time
+  column updated_at : Time
+
+  belongs_to job : Job, foreign_key: "job_id", foreign_key_type: UUID
+  has_many tasks : Task, foreign_key: "job_group_id"
+end
+
+class Task
+  include Clear::Model
+
+  primary_key type: :uuid
+  column created_at : Time
+  column updated_at : Time
+  column status : BuildStatus
+
+  belongs_to job_group : JobGroup, foreign_key: "job_group_id", foreign_key_type: UUID
+  has_many stdout : LogLine, foreign_key: "task_id"
+  has_many stderr : LogLine, foreign_key: "task_id"
+end
+
+Clear.enum LogLineType, "stdout", "stderr"
+
+class LogLine
+  include Clear::Model
+
+  primary_key type: :uuid
+  column created_at : Time
+  column data : String
+  column type : LogLineType
+
+  belongs_to task : Task, foreign_key: "task_id", foreign_key_type: UUID
+end
+
+class Node
+  include Clear::Model
+
+  primary_key type: :uuid
+  column created_at : Time
+  column updated_at : Time
+  column data : JSON::Any
+
+  @parsed : ::BitteCI::Listener::Node::NodePayload?
+
+  # TODO: Optimize this (see https://github.com/anykeyh/clear/issues/95 )!
+  def parsed
+    @parsed ||=
+      ::BitteCI::Listener::Node::NodePayload.from_json(data.to_json)
   end
 end
