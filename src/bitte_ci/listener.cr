@@ -74,6 +74,7 @@ module BitteCI
         nomad_url = config.nomad_base_url.dup
         nomad_url.path = "/v1/event/stream"
         nomad_url.query = URI::Params.new({
+          "topic" => ["Job", "Allocation", "Deployment", "Evaluation"],
           "index" => [(index + 1).to_s],
         }).to_s
 
@@ -99,6 +100,7 @@ module BitteCI
     end
 
     def handle_line(db, line)
+      raise "Possibly invalid Nomad token" if line == "Permission denied"
       return if line == "{}"
       return unless line.starts_with?("{")
 
