@@ -184,11 +184,6 @@ module BitteCI
     def handle_allocation(db, event : Allocation, index)
       alloc = event.payload.allocation
 
-      unless parse_uuid(alloc.id)
-        log.info { "Not updating allocation #{alloc.id} because it's not an UUID" }
-        return
-      end
-
       File.write("allocation_event.json", alloc.to_json)
 
       db.transaction do
@@ -204,11 +199,6 @@ module BitteCI
 
         update_builds(db, alloc)
       end
-    end
-
-    private def parse_uuid(s : String) : UUID?
-      UUID.new(s)
-    rescue e : ArgumentError
     end
 
     def update_builds(db : DB::Database, alloc : AllocationPayload::Allocation)
