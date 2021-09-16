@@ -420,7 +420,7 @@ module BitteCI
           property driver : String
 
           @[JSON::Field(key: "Env")]
-          property env : Env
+          property env : Hash(String, String)?
 
           @[JSON::Field(key: "KillSignal")]
           property kill_signal : String
@@ -488,40 +488,6 @@ module BitteCI
           property args : Array(String)
 
           property flake_deps : Array(String)
-        end
-
-        class Env
-          include JSON::Serializable
-
-          @[JSON::Field(key: "CLONE_URL")]
-          property clone_url : String
-
-          @[JSON::Field(key: "FULL_NAME")]
-          property full_name : String
-
-          @[JSON::Field(key: "REF")]
-          property ref : String
-
-          @[JSON::Field(key: "GITHUB_USER")]
-          property github_user : String
-
-          @[JSON::Field(key: "SSL_CERT_FILE")]
-          property ssl_cert_file : String
-
-          @[JSON::Field(key: "SHA")]
-          property sha : String
-
-          @[JSON::Field(key: "LABEL")]
-          property label : String
-
-          @[JSON::Field(key: "PR_NUMBER")]
-          property pr_number : String
-
-          @[JSON::Field(key: "PATH")]
-          property path : String
-
-          @[JSON::Field(key: "GITHUB_TOKEN")]
-          property github_token : String
         end
 
         class Lifecycle
