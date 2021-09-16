@@ -123,9 +123,19 @@ module BitteCI
 
       @log.info &.emit("Generating Job", step: @job_config.to_json)
 
-      pp! ::PullRequest.query
-        .where { var("id") == @pr.id }
-        .find_or_create(id: @pr.id, data: @pr.to_json)
+      DB.open(@config.postgres_url.to_s) do |db|
+        db.transaction do
+          db.exec <<-SQL, @pr.id, @pr.to_json
+            INSERT INTO pull_requests (id, data) VALUES ($1, $2)
+            ON CONFLICT (id) DO UPDATE SET data = $2;
+          SQL
+
+          # This for some reason ignores the where clause
+          # ::PullRequest.query
+          #   .where { var("id") == @pr.id }
+          #   .find_or_create(id: @pr.id, data: @pr.to_json)
+        end
+      end
 
       @job_config.ci.steps.each do |_key, step|
         step.after = ["prepare"] if step.after.empty?
