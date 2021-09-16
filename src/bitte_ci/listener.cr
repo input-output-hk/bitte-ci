@@ -249,10 +249,9 @@ module BitteCI
     end
 
     def create_allocation(db : DB::Database, event : Allocation, index : UInt64)
+      alloc = event.payload.allocation
       pr_id = job_id_to_pr_id(db, alloc.job_id)
       return unless pr_id
-
-      alloc = event.payload.allocation
 
       new_alloc = ::Allocation.create(
         id: alloc.id,
