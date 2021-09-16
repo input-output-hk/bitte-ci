@@ -284,7 +284,7 @@ module BitteCI
           property spreads : Nil
 
           @[JSON::Field(key: "StopAfterClientDisconnect")]
-          property stop_after_client_disconnect : UInt64
+          property stop_after_client_disconnect : UInt64?
 
           @[JSON::Field(key: "Tasks")]
           property tasks : Array(Task)
