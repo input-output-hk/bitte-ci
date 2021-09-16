@@ -183,73 +183,102 @@ module BitteCI
 
     def handle_allocation(db, event : Allocation, index)
       alloc = event.payload.allocation
+
+      unless parse_uuid(alloc.id)
+        log.info { "Not updating allocation #{alloc.id} because it's not an UUID" }
+        return
+      end
+
       File.write("allocation_event.json", alloc.to_json)
 
       db.transaction do
         log.info { "Updating allocation #{alloc.id} with #{alloc.client_status}" }
 
-        pr_id = 0i64
-        job_id = alloc.job_id
-
-        db.query "SELECT (data->'Job'->'Meta'->>'pull_request_id')::bigint from jobs WHERE id = $1;", job_id do |rs|
-          rs.each do
-            pr_id = rs.read(Int64)
-          end
-        end
-
         old_alloc = ::Allocation.query.where { var("id") == alloc.id }.first
 
         if old_alloc
-          changed = false
-
-          old_alloc.parsed.allocation.task_states.try &.each do |old_name, old_state|
-            alloc.task_states.try &.each do |new_name, new_state|
-              next if old_name != new_name
-              next if new_state.failed == old_state.failed && new_state.state == old_state.state
-
-              changed = true
-            end
-          end
-
-          old_alloc.update(
-            index: index.to_i64,
-            updated_at: Time.utc,
-            client_status: alloc.client_status,
-            data: JSON.parse(event.payload.to_json),
-          )
-
-          db.exec("SELECT pg_notify($1, $2)", "allocations", alloc.id) if changed
+          update_allocation(db, event, index, old_alloc)
         else
-          new_alloc = ::Allocation.create(
-            id: alloc.id,
-            eval_id: alloc.eval_id,
-            job_id: alloc.job_id,
-            pr_id: pr_id,
-            index: index,
-            client_status: alloc.client_status,
-            data: event.payload.to_json
-          )
-
-          db.exec "SELECT pg_notify($1, $2)", "allocations", alloc.id
+          create_allocation(db, event, index)
         end
 
-        case alloc.client_status
-        when "failed", "complete"
-          db.exec <<-SQL, alloc.eval_id, alloc.client_status
-            UPDATE builds
-              SET build_status = $2, updated_at = NOW(), finished_at = NOW()
-              WHERE id = $1 AND build_status != $2;
-          SQL
-        else
-          db.exec <<-SQL, alloc.eval_id, alloc.client_status
-            UPDATE builds
-              SET build_status = $2, updated_at = NOW()
-              WHERE id = $1 AND build_status != $2;
-          SQL
-        end
-
-        db.exec "SELECT pg_notify($1, $2)", "builds", alloc.eval_id
+        update_builds(db, alloc)
       end
+    end
+
+    private def parse_uuid(s : String) : UUID?
+      UUID.new(s)
+    rescue e : ArgumentError
+    end
+
+    def update_builds(db : DB::Database, alloc : AllocationPayload::Allocation)
+      case alloc.client_status
+      when "failed", "complete"
+        db.exec <<-SQL, alloc.eval_id, alloc.client_status
+          UPDATE builds
+            SET build_status = $2, updated_at = NOW(), finished_at = NOW()
+            WHERE id = $1 AND build_status != $2;
+        SQL
+      else
+        db.exec <<-SQL, alloc.eval_id, alloc.client_status
+          UPDATE builds
+            SET build_status = $2, updated_at = NOW()
+            WHERE id = $1 AND build_status != $2;
+        SQL
+      end
+
+      db.exec "SELECT pg_notify($1, $2)", "builds", alloc.eval_id
+    end
+
+    def update_allocation(db : DB::Database, event : Allocation, index : UInt64, old_alloc : ::Allocation)
+      alloc = event.payload.allocation
+      changed = false
+
+      old_alloc.parsed.allocation.task_states.try &.each do |old_name, old_state|
+        alloc.task_states.try &.each do |new_name, new_state|
+          next if old_name != new_name
+          next if new_state.failed == old_state.failed && new_state.state == old_state.state
+
+          changed = true
+        end
+      end
+
+      old_alloc.update(
+        index: index.to_i64,
+        updated_at: Time.utc,
+        client_status: alloc.client_status,
+        data: JSON.parse(event.payload.to_json),
+      )
+
+      db.exec("SELECT pg_notify($1, $2)", "allocations", alloc.id) if changed
+    end
+
+    def create_allocation(db : DB::Database, event : Allocation, index : UInt64)
+      alloc = event.payload.allocation
+
+      new_alloc = ::Allocation.create(
+        id: alloc.id,
+        eval_id: alloc.eval_id,
+        job_id: alloc.job_id,
+        pr_id: job_id_to_pr_id(db, alloc.job_id),
+        index: index,
+        client_status: alloc.client_status,
+        data: event.payload.to_json
+      )
+
+      db.exec "SELECT pg_notify($1, $2)", "allocations", alloc.id
+    end
+
+    def job_id_to_pr_id(db : DB::Database, job_id : String) : Int64?
+      pr_id = nil
+
+      db.query "SELECT (data->'Job'->'Meta'->>'pull_request_id')::bigint from jobs WHERE id = $1;", job_id do |rs|
+        rs.each do
+          pr_id = rs.read(Int64)
+        end
+      end
+
+      pr_id
     end
   end
 end
