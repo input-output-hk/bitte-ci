@@ -201,6 +201,11 @@ module BitteCI
       end
     end
 
+    private def parse_uuid(s : String) : UUID?
+      UUID.new(s)
+    rescue e : ArgumentError
+    end
+
     def update_builds(db : DB::Database, alloc : AllocationPayload::Allocation)
       case alloc.client_status
       when "failed", "complete"
@@ -244,6 +249,9 @@ module BitteCI
     end
 
     def create_allocation(db : DB::Database, event : Allocation, index : UInt64)
+      pr_id = job_id_to_pr_id(db, alloc.job_id)
+      return unless pr_id
+
       alloc = event.payload.allocation
 
       new_alloc = ::Allocation.create(
@@ -269,6 +277,9 @@ module BitteCI
       end
 
       pr_id
+    rescue e : PQ::PQError
+      log.error &.emit("Couldn't get PR for job id", job_id: job_id, error: e.inspect)
+      nil
     end
   end
 end
