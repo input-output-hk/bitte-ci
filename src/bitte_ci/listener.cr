@@ -167,6 +167,7 @@ module BitteCI
 
     def handle_job(db, event : Job, index)
       job = event.payload.job
+      return unless parse_uuid(job.id)
       File.write("evaluation_event.json", job.to_json)
 
       db.transaction do
