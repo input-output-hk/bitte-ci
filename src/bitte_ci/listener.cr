@@ -259,11 +259,11 @@ module BitteCI
       log.info { "Create allocation #{alloc.id} PR: #{pr_id}" }
       return unless pr_id
 
-      new_alloc = ::Allocation.create(
+      ::Allocation.create!(
         id: alloc.id,
         eval_id: alloc.eval_id,
         job_id: alloc.job_id,
-        pr_id: job_id_to_pr_id(db, alloc.job_id),
+        pr_id: pr_id,
         index: index,
         client_status: alloc.client_status,
         data: event.payload.to_json
