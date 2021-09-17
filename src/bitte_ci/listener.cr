@@ -266,7 +266,9 @@ module BitteCI
         pr_id: pr_id,
         index: index,
         client_status: alloc.client_status,
-        data: event.payload.to_json
+        data: event.payload.to_json,
+        created_at: alloc.create_time,
+        updated_at: alloc.modify_time,
       )
 
       db.exec "SELECT pg_notify($1, $2)", "allocations", alloc.id
