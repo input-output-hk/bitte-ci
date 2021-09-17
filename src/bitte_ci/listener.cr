@@ -135,6 +135,7 @@ module BitteCI
 
     def handle_node(db, event : Node, index)
       node = event.payload.node
+      log.info { "Handling node #{node.id}" }
       File.write("node_event.json", node.to_json)
 
       db.transaction do
@@ -151,6 +152,7 @@ module BitteCI
 
     def handle_evaluation(db, event : Evaluation, index)
       eval = event.payload.evaluation
+      log.info { "Handling evaluation #{eval.id}" }
       File.write("evaluation_event.json", eval.to_json)
 
       db.transaction do
@@ -167,8 +169,10 @@ module BitteCI
 
     def handle_job(db, event : Job, index)
       job = event.payload.job
-      return unless parse_uuid(job.id)
+      log.info { "Handling job #{job.id}" }
       File.write("evaluation_event.json", job.to_json)
+
+      return unless parse_uuid(job.id)
 
       db.transaction do
         log.info { "Updating job #{job.id}" }
@@ -184,12 +188,10 @@ module BitteCI
 
     def handle_allocation(db, event : Allocation, index)
       alloc = event.payload.allocation
-
+      log.info { "Handling allocation #{alloc.id}" }
       File.write("allocation_event.json", alloc.to_json)
 
       db.transaction do
-        log.info { "Updating allocation #{alloc.id} with #{alloc.client_status}" }
-
         old_alloc = ::Allocation.query.where { var("id") == alloc.id }.first
 
         if old_alloc
@@ -208,6 +210,7 @@ module BitteCI
     end
 
     def update_builds(db : DB::Database, alloc : AllocationPayload::Allocation)
+      log.info { "Update build for alloc: #{alloc.id}" }
       case alloc.client_status
       when "failed", "complete"
         db.exec <<-SQL, alloc.eval_id, alloc.client_status
@@ -228,6 +231,7 @@ module BitteCI
 
     def update_allocation(db : DB::Database, event : Allocation, index : UInt64, old_alloc : ::Allocation)
       alloc = event.payload.allocation
+      log.info { "Update allocation #{alloc.id}" }
       changed = false
 
       old_alloc.parsed.allocation.task_states.try &.each do |old_name, old_state|
@@ -252,6 +256,7 @@ module BitteCI
     def create_allocation(db : DB::Database, event : Allocation, index : UInt64)
       alloc = event.payload.allocation
       pr_id = job_id_to_pr_id(db, alloc.job_id)
+      log.info { "Create allocation #{alloc.id} PR: #{pr_id}" }
       return unless pr_id
 
       new_alloc = ::Allocation.create(
@@ -280,6 +285,24 @@ module BitteCI
     rescue e : PQ::PQError
       log.error &.emit("Couldn't get PR for job id", job_id: job_id, error: e.inspect)
       nil
+    end
+
+    def self.print_line_events(line)
+      j = Line.from_json(line)
+      j.events.each do |event|
+        case event
+        in Allocation
+          pp! event.topic
+        in Evaluation
+          pp! event.topic
+        in Job
+          pp! event.topic, event.payload.job.id
+        in Node
+          pp! event.topic
+        in Event
+          pp! event.topic
+        end
+      end
     end
   end
 end
