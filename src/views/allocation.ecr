@@ -4,13 +4,13 @@
       <a class="btn btn-secondary" href="/pull_request/<%= allocation.pr_id %>">Pull Request</a>
     </div>
     <div class="col">
-      <a class="btn btn-secondary" href="http://127.0.0.1:4646/ui/jobs/<%= h allocation.job_id %>">Job in Nomad</a>
+      <a class="btn btn-secondary" href="<%= config.nomad_base_url %>/ui/jobs/<%= h allocation.job_id %>">Job in Nomad</a>
     </div>
     <div class="col">
-      <a class="btn btn-secondary" href="http://127.0.0.1:4646/ui/jobs/<%= h allocation.job_id %>/<%= h alloc.task_group %>">Task Group in Nomad</a>
+      <a class="btn btn-secondary" href="<%= config.nomad_base_url %>/ui/jobs/<%= h allocation.job_id %>/<%= h alloc.task_group %>">Task Group in Nomad</a>
     </div>
     <div class="col">
-      <a class="btn btn-secondary" href="http://127.0.0.1:4646/ui/allocations/<%= h alloc.id %>">Allocation in Nomad</a>
+      <a class="btn btn-secondary" href="<%= config.nomad_base_url %>/ui/allocations/<%= h alloc.id %>">Allocation in Nomad</a>
     </div>
   </div>
 
