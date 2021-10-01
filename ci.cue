@@ -17,4 +17,4 @@ ci: {
 
 // some default values
 #step: enable: bool | *(#isMaster && #isAdmin)
-#step: flakes: "github:NixOS/nixpkgs": ["bash", "hello"]
+#step: flakes: "github:NixOS/nixpkgs": ["hello"]
