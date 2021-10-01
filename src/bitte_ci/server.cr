@@ -121,6 +121,24 @@ module BitteCI
       rest.to_json
     end
 
+    def loki_logs(loki_base_url, alloc_id)
+      Loki.query_range(
+        loki_base_url,
+        query: %({nomad_alloc_id="#{alloc_id}"}),
+        from: Time.unix(0),
+        to: Time.utc,
+      )
+    end
+
+    def loki_logs(loki_base_url, alloc_id, step_name)
+      Loki.query_range(
+        loki_base_url,
+        query: %({nomad_alloc_id="#{alloc_id}",bitte_ci_step="#{step_name}"}),
+        from: Time.unix(0),
+        to: Time.utc,
+      )
+    end
+
     macro not_found
       title = "Not Found"
       halt env, status_code: 404, response: lrender("404")
@@ -139,10 +157,10 @@ module BitteCI
     end
 
     def h(n : Nil)
-      ""
+      "&nbsp;"
     end
 
-    def h(n : UUID)
+    def h(n : UUID | Int32 | UInt64 | Bool | Time | Time::Span)
       n.to_s
     end
 
@@ -188,21 +206,57 @@ module BitteCI
       end
 
       get "/nodes" do |env|
-        nodes = Node.query.map(&.parsed.node)
+        # ameba:disable Lint/UselessAssign
+        nodes = Node.query.map(&.parsed)
         title = "Nodes"
         lrender "nodes"
       end
 
       get "/jobs" do |env|
-        jobs = Job.query.map(&.parsed.job)
+        # ameba:disable Lint/UselessAssign
+        jobs = Job.query.map(&.parsed)
         title = "Jobs"
         lrender "jobs"
       end
 
       get "/allocations" do |env|
-        allocs = Allocation.query.map(&.parsed.allocation)
+        # ameba:disable Lint/UselessAssign
+        allocs = Allocation.query.order_by(:created_at, :desc).map(&.parsed)
         title = "Allocations"
         lrender "allocations"
+      end
+
+      get "/allocation/:id" do |env|
+        id = env.params.url["id"]
+        allocation = Allocation.query.where { var("id") == id }.first
+        if allocation
+          alloc = allocation.parsed
+          # ameba:disable Lint/UselessAssign
+          logs = loki_logs(config.loki_base_url, id)
+          # ameba:disable Lint/UselessAssign
+          outputs = allocation.outputs
+            .select(:id, :size, :created_at, :path, :mime, :sha256).to_a
+          title = alloc.name
+          lrender "allocation"
+        else
+          not_found
+        end
+      end
+
+      get "/log/:id/:step" do |env|
+        id = env.params.url["id"]
+        step_name = env.params.url["step"]
+
+        logs = loki_logs(config.loki_base_url, id, step_name)
+
+        compiled = logs.flat_map do |_name, log|
+          log.map do |l|
+            "#{l.timestamp.to_rfc3339}\t#{l.line.rstrip}"
+          end
+        end
+
+        env.response.headers["Content-Type"] = "text/plain"
+        compiled.join("\n")
       end
 
       get "/pull_request/:id" do |env|
@@ -245,7 +299,6 @@ module BitteCI
         # ameba:disable Lint/UselessAssign
         failing_alloc = alloc
           .parsed
-          .allocation
           .task_states
           .try &.any? { |n, state|
             state.events.any? { |event|

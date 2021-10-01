@@ -19,6 +19,7 @@
   ../../src/bitte_ci/trigger.cr
   ../../src/bitte_ci/uuid.cr
   ../../src/views/404.ecr
+  ../../src/views/allocation.ecr
   ../../src/views/allocations.ecr
   ../../src/views/build.ecr
   ../../src/views/index.ecr

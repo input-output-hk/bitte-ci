@@ -1,0 +1,284 @@
+<div class="container-xxl">
+  <div class="row">
+    <div class="col">
+      <a class="btn btn-secondary" href="/pull_request/<%= allocation.pr_id %>">Pull Request</a>
+    </div>
+    <div class="col">
+      <a class="btn btn-secondary" href="http://127.0.0.1:4646/ui/jobs/<%= h allocation.job_id %>">Job in Nomad</a>
+    </div>
+    <div class="col">
+      <a class="btn btn-secondary" href="http://127.0.0.1:4646/ui/jobs/<%= h allocation.job_id %>/<%= h alloc.task_group %>">Task Group in Nomad</a>
+    </div>
+    <div class="col">
+      <a class="btn btn-secondary" href="http://127.0.0.1:4646/ui/allocations/<%= h alloc.id %>">Allocation in Nomad</a>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-6">
+      <h2 class="h2">General Information</h2>
+      <dl class="row">
+        <dt class="col-sm-2">Status:</dt><dd class="col-sm-10"><%= h alloc.client_status %> (<%= h alloc.client_description %>)</dd>
+        <dt class="col-sm-2">Task Group:</dt><dd class="col-sm-10"><%= h alloc.task_group %></dd>
+        <dt class="col-sm-2">Created:</dt><dd class="col-sm-10"><%= h alloc.create_time %></dd>
+        <dt class="col-sm-2">Job:</dt><dd class="col-sm-10"><a href="/job/<%= h alloc.job_id %>"><%= h alloc.job_id %></a></dd>
+        <dt class="col-sm-2">Node:</dt><dd class="col-sm-10"><a href="/node/<%= h alloc.node_id %>"><%= h alloc.node_name %></a></dd>
+      </dl>
+    </div>
+
+    <div class="col-6">
+      <h2 class="h2">Allocated Resources</h2>
+      <dl class="row">
+        <dt class="col-sm-2">Cores:</dt><dd class="col-sm-10"><%= h alloc.resources.cores %></dd>
+        <dt class="col-sm-2">CPU:</dt><dd class="col-sm-10"><%= h alloc.resources.cpu %> Mhz</dd>
+        <dt class="col-sm-2">Disk:</dt><dd class="col-sm-10"><%= h alloc.resources.disk_mb %> MB</dd>
+        <dt class="col-sm-2">IOPS:</dt><dd class="col-sm-10"><%= h alloc.resources.iops %></dd>
+        <dt class="col-sm-2">Memory Max:</dt><dd class="col-sm-10"><%= h alloc.resources.memory_max_mb %> MB</dd>
+        <dt class="col-sm-2">Memory:</dt><dd class="col-sm-10"><%= h alloc.resources.memory_mb %> MB</dd>
+      </dl>
+    </div>
+  </div>
+
+  <% if outputs.any? %>
+    <h2 class="h2">Artifacts</h2>
+
+    <table class="table">
+      <thead>
+        <tr>
+          <td>Path</td>
+          <td>Size</td>
+          <td>Mime</td>
+          <td>SHA256</td>
+        </tr>
+      </thead>
+      <tbody>
+        <% outputs.each do |output| %>
+          <tr>
+            <td><a href="/api/v1/output/<%= output.id %>"><%= h output.path %></a></td>
+            <td><%= h output.size.humanize %></td>
+            <td><%= h output.mime %></td>
+            <td><%= h output.sha256 %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+
+  <h2 class="h2 pt-2">Tasks</h2>
+  <ul class="nav nav-tabs" id="myTab" role="tablist">
+    <% alloc.allocated_resources.tasks.each do |name, res| %>
+      <li class="nav-item" role="presentation">
+        <button
+          class="nav-link"
+          id="<%= h "#{name}-tab" %>"
+          data-bs-toggle="tab"
+          data-bs-target="#tab-<%= h name %>"
+          type="button"
+          role="tab"
+          aria-controls="tab-<%= h name %>"
+          aria-selected="true"
+          ><%= h name %></button>
+      </li>
+    <% end %>
+  </ul>
+
+  <div class="tab-content" id="myTabContent">
+    <% alloc.allocated_resources.tasks.each do |name, res| %>
+      <div class="tab-pane fade" id="tab-<%= h name %>">
+        <% state = alloc.task_states.try &.[name] %>
+
+        <dl class="row pt-2">
+          <% if state %>
+            <dt class="col-sm-3">State:</dt><dd class="col-sm-9"><%= h state.state %></dd>
+            <dt class="col-sm-3">Failed:</dt><dd class="col-sm-9"><%= h state.failed %></dd>
+            <dt class="col-sm-3">Started:</dt><dd class="col-sm-9"><%= h state.started_at %></dd>
+            <% if state.finished_at && state.started_at %>
+              <dt class="col-sm-3">Finished:</dt><dd class="col-sm-9"><%= h state.finished_at %></dd>
+              <dt class="col-sm-3">Duration:</dt><dd class="col-sm-9"><%= h (state.finished_at.not_nil! - state.started_at.not_nil!) %></dd>
+            <% end %>
+            <% if state.restarts > 0 %>
+              <dt class="col-sm-3">Restarts:</dt><dd class="col-sm-9"><%= h state.restarts %></dd>
+              <dt class="col-sm-3">Last Restart:</dt><dd class="col-sm-9"><%= h state.last_restart %></dd>
+            <% end %>
+          <% end %>
+
+          <dt class="col-sm-3">CPU Shares:</dt><dd class="col-sm-9"><%= h res.cpu.cpu_shares %> Mhz</dd>
+          <% if res.cpu.reserved_cores %>
+            <dt class="col-sm-3">CPU Reserved Cores:</dt><dd class="col-sm-9"><%= h res.cpu.reserved_cores %></dd>
+          <% end %>
+          <dt class="col-sm-3">Memory:</dt><dd class="col-sm-9"><%= h res.memory.memory_mb %> MB</dd>
+          <% if res.memory.memory_max_mb > 0 %>
+            <dt class="col-sm-3">Memory Max:</dt><dd class="col-sm-9"><%= h res.memory.memory_max_mb %> MB</dd>
+          <% end %>
+        </dl>
+
+        <h3 class="h3">Task Logs</h3>
+
+        <% logs.select{|step_name, log| step_name == name }.each do |step_name, log| %>
+          <% id = "log-#{name}-#{step_name}" %>
+
+          <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#<%= h id %>" aria-expanded="false" aria-controls="<%= h id %>">
+            Show
+          </button>
+          <a class="btn btn-secondary" href="/log/<%= h alloc.id %>/<%= h name %>">Raw</a>
+
+          <table class="table table-borderless table-sm collapse" id="<%= h id %>">
+            <%- log.each do |l| -%>
+              <tr class="<%= l.labels["pipe"]? == "stderr" ? "text-danger" : "text-body" %>">
+                <td class="time"><%= l.timestamp.to_s("%T.%L") %></td>
+                <td class="line"><%= h l.line.rstrip %></td>
+              </tr>
+            <% end %>
+          </table>
+        <% end %>
+
+        <% if state %>
+          <h3 class="h3 pt-2">Event Logs</h3>
+
+          <table class="table table-borderless table-sm">
+            <% state.events.each do |event| %>
+            <% time = event.time.to_s("%T.%L") %>
+            <tr>
+              <% if event.type == "Received" %>
+                <td class="time"><%= h time %></td>
+                <td class="line"><%= h event.display_message.rstrip %></td>
+              <% elsif event.type == "Task Setup" %>
+                <td class="time"><%= h time %></td>
+                <td class="line"><%= h event.display_message.rstrip %></td>
+              <% elsif event.type == "Nix" %>
+                <td class="time"><%= h time %></td>
+                <td class="line"><%= h event.type %>: <%= h event.display_message.rstrip %></td>
+              <% elsif event.type == "Task hook failed" %>
+                <td class="time"><%= h time %></td>
+                <td class="line"><%= h event.display_message.rstrip %></td>
+              <% elsif event.type == "Not Restarting" %>
+                <td class="time"><%= h time %></td>
+                <td class="line"><%= h event.type %>: <%= h event.display_message.rstrip %></td>
+              <% elsif event.type == "Killing" %>
+                <td class="time"><%= h time %></td>
+                <td class="line"><%= h event.type %>: <%= h event.display_message.rstrip %></td>
+              <% elsif event.type == "Started" %>
+                <td class="time"><%= h time %></td>
+                <td class="line"><%= h event.display_message.rstrip %></td>
+              <% elsif event.type == "Restarting" %>
+                <td class="time"><%= h time %></td>
+                <td class="line"><%= h event.display_message.rstrip %></td>
+              <% elsif event.type == "Sibling Task Failed" %>
+                <td class="time"><%= h time %></td>
+                <td class="line">Task's sibling "<a href="#tab-<%= h event.failed_sibling %>"><%= h event.failed_sibling %></a>" failed</td>
+              <% elsif event.type == "Terminated" %>
+                <td class="time"><%= h time %></td>
+                <td class="line"><%= h event.type %>: <%= event.details.map{|k,v| "#{h k}: #{h v}" }.join(", ") %></td>
+              <% else %>
+                <td colspan="2">
+                  <table class="table">
+                    <tr>
+                      <td>time</td>
+                      <td>type</td>
+                      <td>details</td>
+                      <td>disk_limit</td>
+                      <td>display_message</td>
+                      <td>download_error</td>
+                      <td>driver_error</td>
+                      <td>driver_message</td>
+                      <td>exit_code</td>
+                      <td>failed_sibling</td>
+                      <td>fails_task</td>
+                      <td>generic_source</td>
+                      <td>kill_error</td>
+                      <td>kill_reason</td>
+                      <td>kill_timeout</td>
+                      <td>message</td>
+                      <td>restart_reason</td>
+                      <td>setup_error</td>
+                      <td>signal</td>
+                      <td>start_delay</td>
+                      <td>task_signal</td>
+                      <td>task_signal_reason</td>
+                      <td>validation_error</td>
+                      <td>vault_error</td>
+                    </tr>
+                    <tr>
+                      <td><%= h event.time %></td>
+                      <td><%= h event.type %></td>
+                      <td>
+                        <% event.details.each do |key, value| %>
+                          <%= h key %>: <%= h value %><br/>
+                        <% end %>
+                      </td>
+                      <td><%= h event.disk_limit %></td>
+                      <td><%= h event.display_message %></td>
+                      <td><%= h event.download_error %></td>
+                      <td><%= h event.driver_error %></td>
+                      <td><%= h event.driver_message %></td>
+                      <td><%= h event.exit_code %></td>
+                      <td><%= h event.failed_sibling %></td>
+                      <td><%= h event.fails_task %></td>
+                      <td><%= h event.generic_source %></td>
+                      <td><%= h event.kill_error %></td>
+                      <td><%= h event.kill_reason %></td>
+                      <td><%= h event.kill_timeout %></td>
+                      <td><%= h event.message %></td>
+                      <td><%= h event.restart_reason %></td>
+                      <td><%= h event.setup_error %></td>
+                      <td><%= h event.signal %></td>
+                      <td><%= h event.start_delay %></td>
+                      <td><%= h event.task_signal %></td>
+                      <td><%= h event.task_signal_reason %></td>
+                      <td><%= h event.validation_error %></td>
+                      <td><%= h event.vault_error %></td>
+                    </tr>
+                  </table>
+                </td>
+                <% end %>
+              </tr>
+            <% end %>
+          </table>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<style>
+  td.time, td.line {
+    font-size: 0.7em;
+  }
+
+  td.time {
+    user-select: none;
+    width: 7em;
+  }
+
+  td.line {
+    font-family: "SFMono-Regular", Monaco, Menlo, Consolas, "Liberation Mono", Courier, monospace;
+    white-space: pre-wrap;
+    vertical-align: middle;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+</style>
+
+<script>
+  var triggerTabList = [].slice.call(document.querySelectorAll('#myTab button'))
+  var first = true
+  triggerTabList.forEach(function (triggerEl) {
+    var tabTrigger = new bootstrap.Tab(triggerEl)
+
+    triggerEl.addEventListener('click', function (event) {
+      event.preventDefault()
+      document.location.hash = triggerEl.dataset.bsTarget
+      tabTrigger.show()
+    })
+
+    if (first || (document.location.hash === triggerEl.dataset.bsTarget)) {
+      tabTrigger.show()
+    }
+
+    first = false
+  })
+
+  var showLogsList = [].slice.call(document.querySelectorAll(".show-logs"))
+  showLogsList.forEach(function (e) {
+  })
+</script>

@@ -6,7 +6,10 @@ let
     "bitte-ci"
   else
     "bitte-ci-${extraArgs.name}";
-  version = "0.1.1";
+
+  version = builtins.elemAt (builtins.match ".*version: (([[:digit:]]+\\.?)+).*"
+    (builtins.readFile ../../shard.yml)) 0;
+
   name = "${pname}-${version}";
 
   crystalLib = linkFarm "crystal-lib" (lib.mapAttrsToList (name: value: {
@@ -18,10 +21,10 @@ let
     if extraArgs.static or false then [ "--static" "--release" ] else [ ];
 
   mkSrc = paths: inclusive ../.. paths;
-in clang10Stdenv.mkDerivation {
-  inherit pname version;
 
   src = mkSrc (import (./. + "/input_${extraArgs.name}.nix"));
+in clang10Stdenv.mkDerivation {
+  inherit pname version src;
 
   LLVM_CONFIG = "${llvm_10}/bin/llvm-config";
 

@@ -256,6 +256,11 @@
             command =
               "sudo -E --preserve-env=PATH ${pkgs.nomad}/bin/nomad agent -dev -config $DEVSHELL_ROOT/agent.hcl";
           })
+          (run {
+            name = "version";
+            help = "Increment the version in the shard.yml";
+            command = "${./scripts/version.cr}";
+          })
         ];
 
         packages = with pkgs;

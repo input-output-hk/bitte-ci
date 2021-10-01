@@ -133,12 +133,19 @@ module BitteCI
         start
       end
 
-      FileUtils.mkdir_p(STATUS_DIR)
-      File.write(STATUS_DIR / @config.name, status.exit_status.to_s)
+      persist_exit_code(status)
 
       post_start if status.normal_exit? && status.success?
 
-      exit status.exit_status
+      exit status.exit_code
+    end
+
+    def persist_exit_code(status)
+      @loki.log "#{@config.name} failed with #{status.exit_code}"
+      FileUtils.mkdir_p(STATUS_DIR)
+      file = STATUS_DIR / @config.name
+      File.write("#{file}.new", status.exit_code.to_s)
+      FileUtils.mv("#{file}.new", file)
     end
 
     def start
@@ -169,7 +176,8 @@ module BitteCI
         dependency_status = Process::Status.new(File.read(STATUS_DIR/task_name).to_i)
 
         unless dependency_status.success?
-          raise "Dependency #{task_name} failed with #{dependency_status.exit_status}"
+          persist_exit_code(dependency_status)
+          exit dependency_status.exit_code
         end
 
         if File.directory?(REPO_LOCAL)
@@ -177,14 +185,14 @@ module BitteCI
         end
       end
 
-      unless File.exists?("/usr/bin/env")
-        FileUtils.mkdir_p("/usr/bin")
-        FileUtils.ln_s("/bin/env", "/usr/bin/env")
-      end
+      @loki.log "Linking /usr/bin/env"
+      FileUtils.mkdir_p("/usr/bin")
+      FileUtils.ln_sf("/bin/env", "/usr/bin/env")
     end
 
     def post_start
       Artificer.run(@config)
+      @loki.log "Copying repository to #{REPO_TRANS}"
       if File.directory?(REPO_LOCAL)
         FileUtils.cp_r(REPO_LOCAL.to_s, REPO_TRANS.to_s)
       end

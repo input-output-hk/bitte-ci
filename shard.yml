@@ -1,9 +1,8 @@
-name: "bitte-ci"
-version: 0.1.1
-
+---
+name: bitte-ci
+version: 2021.10.01.000
 authors:
-  - Michael Fellinger <michael.fellinger@iohk.io>
-
+- Michael Fellinger <michael.fellinger@iohk.io>
 targets:
   bitte-ci:
     main: src/bitte_ci/cli/bitte-ci.cr
@@ -19,11 +18,8 @@ targets:
     main: src/bitte_ci/cli/queue.cr
   bitte-ci-server:
     main: src/bitte_ci/cli/server.cr
-
 crystal: 1.0.0
-
 license: MIT
-
 dependencies:
   kemal:
     github: kemalcr/kemal

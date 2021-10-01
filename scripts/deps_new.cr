@@ -37,8 +37,6 @@ Dir.glob("src/bitte_ci/cli/*.cr") do |cli|
 
   Log.info { "found #{found.size} files" }
 
-  pp! found
-
   inputs = found.map { |f| (Path[__DIR__] / f).relative_to(srcdir / "pkgs/bitte-ci") }
 
   file = %([ #{inputs.sort.join(" ")} ])

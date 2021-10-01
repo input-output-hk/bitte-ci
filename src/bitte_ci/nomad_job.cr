@@ -65,8 +65,7 @@ module BitteCI
       nomad_url = @config.nomad_base_url.dup
       nomad_url.path = "/v1/jobs"
 
-      json = rendered.to_json
-
+      # json = rendered.to_json
       # Process.run("iogo",
       #   args: ["json2hcl"],
       #   input: IO::Memory.new(json),
@@ -183,7 +182,7 @@ module BitteCI
 
       # combine the required dependencies for the runner.sh with
       def dependencies
-        deps = %w[bash cacert command-static].map { |a| "#{@job_config.runner_flake}##{a}" }
+        deps = %w[bash cacert command].map { |a| "#{@job_config.runner_flake}##{a}" }
         original = @config.flakes.flat_map { |k, vs| vs.map { |v| "#{k}##{v}" } }
         (deps + original).uniq
       end

@@ -48,6 +48,7 @@ module BitteCI
     end
 
     def stop
+      return if @stopping
       @log.info { "stopping Loki exporter" }
       @inbox.close
       @timer.close
@@ -155,47 +156,53 @@ module BitteCI
       @log.error &.emit("log", error: e.to_s) unless @stopping
     end
 
-    def self.query_range(loki_base_url, loki_id, from, to)
-      query = URI::Params.new(
-        {
-          "direction" => ["backward"],
-          "query"     => [%({bitte_ci_id="#{loki_id}"})],
-          "start"     => [(from.to_unix_ms * 1000000).to_s],
-          "end"       => [((to || Time.utc).to_unix_ms * 1000000).to_s],
-          "limit"     => ["1000"],
-        }
+    def self.query_range(loki_base_url, loki_id, from : Time, to : Time?)
+      query_range(
+        loki_base_url,
+        from: from,
+        to: to || Time.utc,
+        query: %({bitte_ci_id="#{loki_id}"}),
       )
+    end
 
-      url = loki_base_url.dup
-      url.path = "/loki/api/v1/query_range"
-      url.query = query.to_s
+    class LogCliLine
+      include JSON::Serializable
+      property labels : Hash(String, String)
+      property line : String
+      property timestamp : Time
+    end
 
-      Log.debug { "querying #{url}" }
+    def self.query_range(loki_base_url : URI, from : Time, to : Time, query : String)
+      reader, writer = IO.pipe
+      args = [
+        "--addr", loki_base_url.to_s,
+        "query",
+        "--forward",
+        "--from", Time::Format::ISO_8601_DATE_TIME.format(from),
+        "--to", Time::Format::ISO_8601_DATE_TIME.format(to),
+        "--include-label", "bitte_ci_step",
+        "--include-label", "pipe",
+        "--batch", "5000",
+        "--limit", "1000000",
+        "--output", "jsonl",
+        "--timezone", "UTC",
+        query,
+      ]
 
-      res = HTTP::Client.get(url)
+      logs = Hash(String, Array(LogCliLine)).new
 
-      range = LokiQueryRange.from_json(res.body)
-
-      logs = Hash(UUID, Hash(String, Array(NamedTuple(time: Time, line: String)))).new
-
-      range.data.result.each do |result|
-        alloc_id = UUID.new(result.stream["nomad_alloc_id"])
-        step_name = result.stream["bitte_ci_step"]
-
-        alloc = logs[alloc_id]?
-        alloc ||= Hash(String, Array(NamedTuple(time: Time, line: String))).new
-
-        step = alloc[step_name]?
-        step ||= Array(NamedTuple(time: Time, line: String)).new
-
-        result.values.each do |line|
-          time, text = line[0], line[1]
-          step << {time: Time.unix_ms((time.to_i64 / 1000000).to_i64), line: text}
+      Process.run("logcli", args: args, output: writer, error: STDERR) do |_process|
+        spawn do
+          reader.each_line do |line|
+            log = LogCliLine.from_json(line)
+            (logs[log.labels["bitte_ci_step"]] ||= Array(LogCliLine).new) << log
+          end
         end
-
-        alloc[step_name] = step
-        logs[alloc_id] = alloc
+        pp! :process_done
       end
+
+      writer.close
+      pp! :writer_done
 
       logs
     end

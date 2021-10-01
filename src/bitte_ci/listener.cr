@@ -59,6 +59,8 @@ module BitteCI
       Clear::SQL.init(config.postgres_url.to_s)
 
       DB.open(config.postgres_url.to_s) do |db|
+        discover(db)
+
         index = 0u64
 
         if config.index
@@ -78,20 +80,46 @@ module BitteCI
           "index" => [(index + 1).to_s],
         }).to_s
 
-        headers = HTTP::Headers{
-          "X-Nomad-Token" => [config.nomad_token],
-        }
-
-        context = ssl_context(config) if nomad_url.scheme == "https"
-
         loop do
-          listen(db, nomad_url, headers, context)
+          listen(db, nomad_url)
           sleep 1
         end
       end
     end
 
-    def listen(db, nomad_url, headers, context)
+    def context
+      ssl_context(config) if config.nomad_base_url.scheme == "https"
+    end
+
+    def ssl_context(config)
+      OpenSSL::SSL::Context::Client.from_hash({
+        "ca"   => config.nomad_ssl_ca,
+        "cert" => config.nomad_ssl_cert,
+        "key"  => config.nomad_ssl_key,
+      })
+    end
+
+    def headers
+      HTTP::Headers{
+        "X-Nomad-Token" => [config.nomad_token],
+      }
+    end
+
+    def discover(db)
+      nodes_url = config.nomad_base_url.dup
+      nodes_url.path = "/v1/nodes"
+      HTTP::Client.get(nodes_url, headers: headers, tls: context) do |res|
+        Array(NamedTuple(ID: String)).from_json(res.body_io).each do |n|
+          node_url = config.nomad_base_url.dup
+          node_url.path = "/v1/node/#{n[:ID]}"
+          HTTP::Client.get(node_url, headers: headers, tls: context) do |node_res|
+            handle_node db, Node::NodePayload::Node.from_json(node_res.body_io)
+          end
+        end
+      end
+    end
+
+    def listen(db, nomad_url)
       HTTP::Client.get(nomad_url, headers: headers, tls: context) do |res|
         res.body_io.each_line { |line| handle_line(db, line) }
       end
@@ -108,13 +136,13 @@ module BitteCI
       j.events.each do |event|
         case event
         when Allocation
-          handle_allocation(db, event, j.index)
+          handle_allocation(db, event.payload.allocation, j.index)
         when Evaluation
-          handle_evaluation(db, event, j.index)
+          handle_evaluation(db, event.payload.evaluation)
         when Job
-          handle_job(db, event, j.index)
+          handle_job(db, event.payload.job)
         when Node
-          handle_node(db, event, j.index)
+          handle_node(db, event.payload.node)
         else
           log.error &.emit("Couldn't parse line, stored as line_unknown.json")
           File.write("line_unknown.json", line)
@@ -125,23 +153,14 @@ module BitteCI
       File.write("line_error.json", line)
     end
 
-    def ssl_context(config)
-      OpenSSL::SSL::Context::Client.from_hash({
-        "ca"   => config.nomad_ssl_ca,
-        "cert" => config.nomad_ssl_cert,
-        "key"  => config.nomad_ssl_key,
-      })
-    end
-
-    def handle_node(db, event : Node, index)
-      node = event.payload.node
+    def handle_node(db, node : Node::NodePayload::Node)
       log.info { "Handling node #{node.id}" }
       File.write("node_event.json", node.to_json)
 
       db.transaction do
         log.info { "Updating node #{node.id}" }
 
-        db.exec <<-SQL, node.id, event.payload.to_json
+        db.exec <<-SQL, node.id, node.to_json
           INSERT INTO nodes
             (id, created_at, updated_at, data) VALUES ($1, NOW(), NOW(), $2)
           ON CONFLICT (id) DO
@@ -150,8 +169,7 @@ module BitteCI
       end
     end
 
-    def handle_evaluation(db, event : Evaluation, index)
-      eval = event.payload.evaluation
+    def handle_evaluation(db, eval : Evaluation::EvaluationPayload::Evaluation)
       log.info { "Handling evaluation #{eval.id}" }
       File.write("evaluation_event.json", eval.to_json)
 
@@ -167,8 +185,7 @@ module BitteCI
       end
     end
 
-    def handle_job(db, event : Job, index)
-      job = event.payload.job
+    def handle_job(db, job : Job::JobPayload::Job)
       log.info { "Handling job #{job.id}" }
       File.write("evaluation_event.json", job.to_json)
 
@@ -177,7 +194,7 @@ module BitteCI
       db.transaction do
         log.info { "Updating job #{job.id}" }
 
-        db.exec <<-SQL, job.id, job.submit_time, event.payload.to_json
+        db.exec <<-SQL, job.id, job.submit_time, job.to_json
           INSERT INTO jobs
             (id, created_at, updated_at, data) VALUES ($1, $2, NOW(), $3)
           ON CONFLICT (id) DO
@@ -186,8 +203,7 @@ module BitteCI
       end
     end
 
-    def handle_allocation(db, event : Allocation, index)
-      alloc = event.payload.allocation
+    def handle_allocation(db, alloc : AllocationPayload::Allocation, index)
       log.info { "Handling allocation #{alloc.id}" }
       File.write("allocation_event.json", alloc.to_json)
 
@@ -195,9 +211,9 @@ module BitteCI
         old_alloc = ::Allocation.query.where { var("id") == alloc.id }.first
 
         if old_alloc
-          update_allocation(db, event, index, old_alloc)
+          update_allocation(db, alloc, index, old_alloc)
         else
-          create_allocation(db, event, index)
+          create_allocation(db, alloc, index)
         end
 
         update_builds(db, alloc)
@@ -229,12 +245,11 @@ module BitteCI
       db.exec "SELECT pg_notify($1, $2)", "builds", alloc.eval_id
     end
 
-    def update_allocation(db : DB::Database, event : Allocation, index : UInt64, old_alloc : ::Allocation)
-      alloc = event.payload.allocation
+    def update_allocation(db : DB::Database, alloc : AllocationPayload::Allocation, index : UInt64, old_alloc : ::Allocation)
       log.info { "Update allocation #{alloc.id}" }
       changed = false
 
-      old_alloc.parsed.allocation.task_states.try &.each do |old_name, old_state|
+      old_alloc.parsed.task_states.try &.each do |old_name, old_state|
         alloc.task_states.try &.each do |new_name, new_state|
           next if old_name != new_name
           next if new_state.failed == old_state.failed && new_state.state == old_state.state
@@ -247,14 +262,13 @@ module BitteCI
         index: index.to_i64,
         updated_at: Time.utc,
         client_status: alloc.client_status,
-        data: JSON.parse(event.payload.to_json),
+        data: JSON.parse(alloc.to_json),
       )
 
       db.exec("SELECT pg_notify($1, $2)", "allocations", alloc.id) if changed
     end
 
-    def create_allocation(db : DB::Database, event : Allocation, index : UInt64)
-      alloc = event.payload.allocation
+    def create_allocation(db : DB::Database, alloc : AllocationPayload::Allocation, index : UInt64)
       pr_id = job_id_to_pr_id(db, alloc.job_id)
       log.info { "Create allocation #{alloc.id} PR: #{pr_id}" }
       return unless pr_id
@@ -266,7 +280,7 @@ module BitteCI
         pr_id: pr_id,
         index: index,
         client_status: alloc.client_status,
-        data: event.payload.to_json,
+        data: alloc.to_json,
         created_at: alloc.create_time,
         updated_at: alloc.modify_time,
       )
@@ -277,7 +291,7 @@ module BitteCI
     def job_id_to_pr_id(db : DB::Database, job_id : String) : Int64?
       pr_id = nil
 
-      db.query "SELECT (data->'Job'->'Meta'->>'pull_request_id')::bigint from jobs WHERE id = $1;", job_id do |rs|
+      db.query "SELECT (data->'Meta'->>'pull_request_id')::bigint from jobs WHERE id = $1;", job_id do |rs|
         rs.each do
           pr_id = rs.read(Int64)
         end

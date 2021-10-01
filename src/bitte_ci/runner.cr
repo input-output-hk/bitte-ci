@@ -143,7 +143,7 @@ module BitteCI
 
       @job_config.ci.steps["prepare"] = JobConfig::Step.new(
         label: "Git checkout to /alloc/repo",
-        flakes: {@config.runner_flake.to_s => ["prepare-static"]},
+        flakes: {@config.runner_flake.to_s => ["prepare"]},
         command: ["bitte-ci-prepare"],
         enable: true,
         vault: false,

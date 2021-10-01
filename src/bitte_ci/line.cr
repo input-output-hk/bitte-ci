@@ -622,7 +622,7 @@ module BitteCI
           include JSON::Serializable
 
           @[JSON::Field(key: "Attributes")]
-          property attributes : NodeAttributes
+          property attributes : Hash(String, String)
 
           @[JSON::Field(key: "CSIControllerPlugins")]
           property csi_controller_plugins : Nil
@@ -707,109 +707,6 @@ module BitteCI
 
           @[JSON::Field(key: "TLSEnabled")]
           property tls_enabled : Bool
-        end
-
-        class NodeAttributes
-          include JSON::Serializable
-
-          @[JSON::Field(key: "driver.docker.runtimes")]
-          property driver_docker_runtimes : String
-
-          @[JSON::Field(key: "memory.totalbytes")]
-          property memory_totalbytes : String
-
-          @[JSON::Field(key: "unique.storage.bytestotal")]
-          property unique_storage_bytestotal : String
-
-          @[JSON::Field(key: "unique.hostname")]
-          property unique_hostname : String
-
-          @[JSON::Field(key: "cpu.arch")]
-          property cpu_arch : String
-
-          @[JSON::Field(key: "kernel.name")]
-          property kernel_name : String
-
-          @[JSON::Field(key: "os.signals")]
-          property os_signals : String
-
-          @[JSON::Field(key: "driver.mock")]
-          property driver_mock : String
-
-          @[JSON::Field(key: "cpu.numcores")]
-          property cpu_numcores : String
-
-          @[JSON::Field(key: "cpu.modelname")]
-          property cpu_modelname : String
-
-          @[JSON::Field(key: "driver.java.runtime")]
-          property driver_java_runtime : String
-
-          @[JSON::Field(key: "driver.java")]
-          property driver_java : String
-
-          @[JSON::Field(key: "unique.storage.volume")]
-          property unique_storage_volume : String
-
-          @[JSON::Field(key: "unique.cgroup.mountpoint")]
-          property unique_cgroup_mountpoint : String
-
-          @[JSON::Field(key: "driver.exec")]
-          property driver_exec : String
-
-          @[JSON::Field(key: "os.name")]
-          property os_name : String
-
-          @[JSON::Field(key: "driver.java.vm")]
-          property driver_java_vm : String
-
-          @[JSON::Field(key: "kernel.version")]
-          property kernel_version : String
-
-          @[JSON::Field(key: "cpu.totalcompute")]
-          property cpu_totalcompute : String
-
-          @[JSON::Field(key: "nomad.advertise.address")]
-          property nomad_advertise_address : String
-
-          @[JSON::Field(key: "nomad.version")]
-          property nomad_version : String
-
-          @[JSON::Field(key: "driver.qemu.version")]
-          property driver_qemu_version : String
-
-          @[JSON::Field(key: "driver.docker.os_type")]
-          property driver_docker_os_type : String
-
-          @[JSON::Field(key: "driver.docker.version")]
-          property driver_docker_version : String
-
-          @[JSON::Field(key: "unique.storage.bytesfree")]
-          property unique_storage_bytesfree : String
-
-          @[JSON::Field(key: "os.version")]
-          property os_version : String
-
-          @[JSON::Field(key: "driver.mock_driver")]
-          property driver_mock_driver : String
-
-          @[JSON::Field(key: "unique.network.ip-address")]
-          property unique_network_ip_address : String
-
-          @[JSON::Field(key: "driver.qemu")]
-          property driver_qemu : String
-
-          @[JSON::Field(key: "cpu.frequency")]
-          property cpu_frequency : String
-
-          @[JSON::Field(key: "driver.docker")]
-          property driver_docker : String
-
-          @[JSON::Field(key: "driver.java.version")]
-          property driver_java_version : String
-
-          @[JSON::Field(key: "driver.raw_exec")]
-          property driver_raw_exec : String
         end
 
         class Driver

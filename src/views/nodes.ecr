@@ -14,7 +14,7 @@
       <td><%= h node.id %></td>
       <td><%= h node.name %></td>
       <td><%= h node.status %></td>
-      <td><%= h node.attributes.nomad_advertise_address %></td>
+      <td><%= h node.attributes["nomad_advertise_address"]? %></td>
       <td><%= h node.datacenter %></td>
       <td><%= h node.resources.cpu.humanize %></td>
       <td><%= h (node.resources.memory_mb * 1024 * 1024).humanize %></td>

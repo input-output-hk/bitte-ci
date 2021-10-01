@@ -189,12 +189,12 @@ class Allocation
   belongs_to pull_request : PullRequest, foreign_key: "pr_id", foreign_key_type: Int64
   belongs_to job : Job, foreign_key: "job_id", foreign_key_type: UUID
 
-  @parsed : ::BitteCI::Listener::AllocationPayload?
+  @parsed : ::BitteCI::Listener::AllocationPayload::Allocation?
 
   # TODO: Optimize this (see https://github.com/anykeyh/clear/issues/95 )!
   def parsed
     @parsed ||=
-      ::BitteCI::Listener::AllocationPayload.from_json(data.to_json)
+      ::BitteCI::Listener::AllocationPayload::Allocation.from_json(data.to_json)
   end
 
   def simplify
@@ -227,23 +227,22 @@ class Allocation
 
   # TODO: only send status if something changed
   def send_github_status(user : String, token : String, target_url : URI)
-    alloc = parsed.allocation
+    alloc = parsed
     pr = pull_request.parsed
-    state = status_to_state
 
     common = {
       user:       user,
       token:      token,
-      state:      state,
+      state:      status_to_state,
       target_url: target_url,
     }
 
     description = "pending"
 
-    case state
-    when "pending"
+    case client_status
+    when BuildStatus::Pending, BuildStatus::Running
       description = "builds pending"
-    when "success"
+    when BuildStatus::Complete
       description = "builds succeeded"
       alloc.task_states.try &.each do |name, state|
         next if state.failed
@@ -254,12 +253,11 @@ class Allocation
           context: "Bitte CI - #{name}"
         )
       end
-    when "failure"
+    else
       description = "builds failed"
 
       alloc.task_states.try &.each do |name, state|
         next unless state.failed
-        pp! name, state.failed, state
 
         pr.send_status(
           **common,
@@ -307,12 +305,12 @@ class Job
   has_many job_groups : JobGroup, foreign_key: "task_id"
   has_many evaluations : Evaluation, foreign_key: "job_id"
 
-  @parsed : ::BitteCI::Listener::Job::JobPayload?
+  @parsed : ::BitteCI::Listener::Job::JobPayload::Job?
 
   # TODO: Optimize this (see https://github.com/anykeyh/clear/issues/95 )!
   def parsed
     @parsed ||=
-      ::BitteCI::Listener::Job::JobPayload.from_json(data.to_json)
+      ::BitteCI::Listener::Job::JobPayload::Job.from_json(data.to_json)
   end
 end
 
@@ -371,11 +369,11 @@ class Node
   column updated_at : Time
   column data : JSON::Any
 
-  @parsed : ::BitteCI::Listener::Node::NodePayload?
+  @parsed : ::BitteCI::Listener::Node::NodePayload::Node?
 
   # TODO: Optimize this (see https://github.com/anykeyh/clear/issues/95 )!
   def parsed
     @parsed ||=
-      ::BitteCI::Listener::Node::NodePayload.from_json(data.to_json)
+      ::BitteCI::Listener::Node::NodePayload::Node.from_json(data.to_json)
   end
 end

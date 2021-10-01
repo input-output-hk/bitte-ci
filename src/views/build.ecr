@@ -34,7 +34,7 @@
   <hr/>
   <h3>Allocation Errors</h3>
 
-  <% a = alloc.parsed.allocation %>
+  <% a = alloc.parsed %>
   <div>Description: <%= h a.client_description %></div>
   <div>Client Status: <%= h a.client_status %></div>
   <div>Created: <%= a.create_time %></div>
@@ -58,33 +58,6 @@
 
 <hr/>
 <h3>Logs</h3>
-
-<ul class="nav nav-tabs" id="myTab" role="tablist">
-  <% logs.each do |alloc_id, steps| %>
-    <% steps.each do |step_name, step | %>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="<%= h "#{step_name}-tab" %>" data-bs-toggle="tab" data-bs-target="#<%= h step_name %>" type="button" role="tab" aria-controls="<%= h step_name %>" aria-selected="true"><%= h step_name %></button>
-      </li>
-    <% end %>
-  <% end %>
-</ul>
-
-<div class="tab-content" id="myTabContent">
-  <% logs.each do |alloc_id, steps| %>
-    <% steps.each do |step_name, step | %>
-      <div class="tab-pane fade" id="<%= h step_name %>">
-        <table class="table table-borderless table-sm">
-          <%- step.each do |step| -%>
-            <tr>
-              <td class="time"><%= step[:time].to_s("%T.%L") %></td>
-              <td class="line"><%= h step[:line].rstrip %></td>
-            </tr>
-          <% end %>
-        </table>
-      </div>
-    <% end %>
-  <% end %>
-</div>
 
 <style>
   td.time, td.line {
