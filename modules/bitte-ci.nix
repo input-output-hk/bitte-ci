@@ -108,7 +108,7 @@ in {
       after =
         [ "bitte-ci-migrate.service" "loki.service" "postgresql.service" ];
       wantedBy = [ "multi-user.target" ];
-      path = with pkgs; [ cue ];
+      path = with pkgs; [ cue grafana-loki ];
 
       # environment.KEMAL_ENV = "production";
 
