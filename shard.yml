@@ -1,6 +1,6 @@
 ---
 name: bitte-ci
-version: 2021.10.01.002
+version: 2021.10.01.003
 authors:
 - Michael Fellinger <michael.fellinger@iohk.io>
 targets:

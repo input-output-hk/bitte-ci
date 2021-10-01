@@ -776,7 +776,7 @@ module BitteCI
           property cpu_shares : UInt64
 
           @[JSON::Field(key: "ReservableCpuCores")]
-          property reservable_cpu_cores : Nil
+          property reservable_cpu_cores : Array(UInt64)?
 
           @[JSON::Field(key: "TotalCpuCores")]
           property total_cpu_cores : UInt64
