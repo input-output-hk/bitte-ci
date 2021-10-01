@@ -664,7 +664,7 @@ module BitteCI
           property last_drain : Nil
 
           @[JSON::Field(key: "Links")]
-          property links : Nil
+          property links : Hash(String, String)?
 
           @[JSON::Field(key: "Meta")]
           property meta : Hash(String, String)?
@@ -713,7 +713,7 @@ module BitteCI
           include JSON::Serializable
 
           @[JSON::Field(key: "Attributes")]
-          property attributes : Hash(String, String)
+          property attributes : Hash(String, String)?
 
           @[JSON::Field(key: "Detected")]
           property detected : Bool
