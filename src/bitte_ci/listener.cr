@@ -109,12 +109,27 @@ module BitteCI
       nodes_url = config.nomad_base_url.dup
       nodes_url.path = "/v1/nodes"
       HTTP::Client.get(nodes_url, headers: headers, tls: context) do |res|
-        Array(NamedTuple(ID: String)).from_json(res.body_io).each do |n|
-          node_url = config.nomad_base_url.dup
-          node_url.path = "/v1/node/#{n[:ID]}"
-          HTTP::Client.get(node_url, headers: headers, tls: context) do |node_res|
-            handle_node db, Node::NodePayload::Node.from_json(node_res.body_io)
-          end
+        discover_apply(db, res)
+      end
+    end
+
+    def discover_apply(db, response)
+      Array(NamedTuple(ID: String)).from_json(response.body_io).each do |n|
+        node_url = config.nomad_base_url.dup.tap(&.path=("/v1/node/#{n[:ID]}"))
+        discover_handle(db, node_url)
+      end
+    rescue e : JSON::ParseException
+      log.error &.emit("Couldn't parse response, stored as discover_apply_error.json", error: e.inspect)
+      File.write("discover_apply_error.json", response.body_io)
+    end
+
+    def discover_handle(db, node_url)
+      HTTP::Client.get(node_url, headers: headers, tls: context) do |node_res|
+        begin
+          handle_node db, Node::NodePayload::Node.from_json(node_res.body_io)
+        rescue e : JSON::ParseException
+          log.error &.emit("Couldn't parse response, stored as discover_error.json", error: e.inspect)
+          File.write("discover_error.json", node_res.body_io)
         end
       end
     end
