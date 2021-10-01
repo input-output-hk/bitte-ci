@@ -7,4 +7,5 @@
   ../../src/bitte_ci/simple_config.cr
   ../../src/bitte_ci/time.cr
   ../../src/bitte_ci/uuid.cr
+  ../../src/bitte_ci/version.cr
 ]

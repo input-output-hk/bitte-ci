@@ -1,4 +1,5 @@
 require "./simple_config"
+require "./version"
 require "log"
 
 module BitteCI
@@ -30,6 +31,11 @@ module BitteCI
 
       parser.on "-h", "--help", "Show this help" do
         puts parser
+        exit
+      end
+
+      parser.on "-v", "--version", "Show the Bitte CI Version" do
+        puts BitteCI::VERSION
         exit
       end
 

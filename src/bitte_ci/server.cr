@@ -10,6 +10,7 @@ require "./runner"
 require "./simple_config"
 require "./trigger"
 require "./uuid"
+require "./version"
 
 module BitteCI
   class Server

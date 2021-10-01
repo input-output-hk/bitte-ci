@@ -18,6 +18,7 @@
   ../../src/bitte_ci/time.cr
   ../../src/bitte_ci/trigger.cr
   ../../src/bitte_ci/uuid.cr
+  ../../src/bitte_ci/version.cr
   ../../src/views/404.ecr
   ../../src/views/allocation.ecr
   ../../src/views/allocations.ecr
