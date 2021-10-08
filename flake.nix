@@ -74,6 +74,9 @@
           libatomic_ops = inputs.libatomic_ops;
         };
 
+        liftbridge = final.callPackage ./pkgs/liftbridge.nix { };
+        liftbridge-cli = final.callPackage ./pkgs/liftbridge-cli.nix { };
+
         tests = final.callPackage ./tests { inherit inputs; };
 
         arion = inputs.arion.defaultPackage.${prev.system};
@@ -100,7 +103,8 @@
       packages.x86_64-linux = {
         # just for development
         inherit (pkgs)
-          nix crystal libgit2 bdwgc arion reproxy ngrok project cacert bash;
+          nix crystal libgit2 bdwgc arion reproxy ngrok project cacert bash
+          liftbridge-cli;
         inherit (pkgs.tests) test-bitte-ci;
       } // pkgs.bitte-ci;
 
@@ -171,7 +175,8 @@
           }
           {
             name = "POSTGRES_URL";
-            value = "postgres://postgres@127.0.0.1:5432/bitte_ci";
+            value =
+              "postgres://postgres@127.0.0.1:5432/bitte_ci?sslmode=disable";
           }
           {
             name = "NOMAD_BASE_URL";
@@ -276,11 +281,21 @@
 
             pkg-config
             fd
-            clang_10
-            lldb_10
+            # clang_10
+            # lldb_10
 
             nixfmt
             nix
+
+            go
+            goimports
+            gopls
+            gocode
+            golangci-lint
+            gcc
+
+            liftbridge
+            liftbridge-cli
           ] ++ pkgs.bitte-ci.bitte-ci.buildInputs;
       };
     };

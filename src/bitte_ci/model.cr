@@ -30,6 +30,18 @@ class PullRequest
     {id: id, data: data, builds: builds.order_by(:created_at, :desc).map(&.simplify)}
   end
 
+  def repository
+    data.dig("repository")
+  end
+
+  def repository_owner_login
+    data.dig("repository", "owner", "login").as_s
+  end
+
+  def repository_name
+    data.dig("repository", "name").as_s
+  end
+
   def pull_request
     data.dig("pull_request")
   end

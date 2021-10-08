@@ -128,7 +128,9 @@ module BitteCI
         Datacenters: @config.nomad_datacenters,
         TaskGroups:  task_groups,
         Meta:        {
-          pull_request_id: @pr.id.to_s,
+          pull_request_id:    @pr.id.to_s,
+          pull_request_owner: @pr.repository.owner.login,
+          pull_request_repo:  @pr.repository.name,
         },
       }
     end

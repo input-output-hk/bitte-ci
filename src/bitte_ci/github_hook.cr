@@ -14,6 +14,7 @@ module BitteCI
       property base : Base
       property head : Base
       property statuses_url : String
+      property repository : Repo
 
       def send_status(user : String, token : String, state : String, target_url : URI, description : String, context = "Bitte CI")
         body = {
@@ -67,8 +68,16 @@ module BitteCI
     class Repo
       include JSON::Serializable
 
+      property name : String
       property full_name : String
       property clone_url : String
+      property owner : Owner
+    end
+
+    class Owner
+      include JSON::Serializable
+
+      property login : String
     end
   end
 end
